@@ -1,0 +1,3204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Atelier Domino — 3D Kinetic Studio</title>
+  <meta name="description" content="Atelier Domino: a calm 3D domino toppling studio. Build, combine and watch it fall." />
+  <meta name="theme-color" content="#1c1917" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Atelier Domino" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #1c1917;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+    .font-serif-display {
+      font-family: 'Playfair Display', Georgia, serif;
+    }
+    .glass-panel {
+      background: rgba(24, 22, 20, 0.72);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 248, 235, 0.12);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+    .glass-pill {
+      background: rgba(24, 22, 20, 0.65);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 248, 235, 0.12);
+    }
+    .btn-active {
+      background: rgba(245, 235, 220, 0.94);
+      color: #1c1917;
+      border-color: rgba(255, 255, 255, 0.8);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    }
+    .btn-idle {
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(245, 240, 232, 0.82);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+    .btn-idle:hover {
+      background: rgba(255, 255, 255, 0.11);
+      color: #ffffff;
+    }
+    .sheet-sec { border-top: 1px solid rgba(255,255,255,0.08); padding: 0.6rem 0; }
+    .sheet-sec:first-child { border-top: none; padding-top: 0; }
+    .sheet-sec > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+      font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: #a8a29e; }
+    .sheet-sec > summary::-webkit-details-marker { display: none; }
+    .sheet-sec > summary::after { content: '▾'; transition: transform .2s; }
+    .sheet-sec[open] > summary::after { transform: rotate(180deg); }
+    .dock-tab.open { background: rgba(245,235,220,0.94); color: #1c1917; }
+    /* Custom subtle scrollbar for mobile horizontal strips */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+
+  <!-- ES Module Shims & Import Map for Three.js + Addons + Cannon-es -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/",
+        "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- 3D Viewport Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Loading Overlay -->
+  <div id="loader-overlay" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#191614] text-[#f5efe6] transition-opacity duration-700">
+    <div class="w-12 h-12 rounded-2xl border border-amber-200/30 flex items-center justify-center mb-4 animate-pulse bg-amber-100/5">
+      <div class="w-3 h-6 rounded-sm bg-amber-200/80 transform -rotate-12"></div>
+    </div>
+    <h1 class="font-serif-display text-2xl tracking-wide text-amber-50">Atelier Domino</h1>
+    <p id="loader-status" class="text-xs uppercase tracking-[0.22em] text-stone-400 mt-2">Crafting Studio Textures &amp; Physics...</p>
+  </div>
+
+  <!-- Top Minimal Header Bar -->
+  <header id="hud-top" class="fixed top-0 left-0 right-0 z-20 p-3 sm:p-5 flex items-start justify-between pointer-events-none transition-opacity duration-300">
+    <!-- Brand & Live Telemetry -->
+    <div class="glass-panel rounded-2xl px-4 py-3 pointer-events-auto flex items-center gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"></span>
+          <h1 class="font-serif-display text-base sm:text-lg text-amber-50 tracking-wide leading-none">Atelier Domino</h1>
+        </div>
+        <p id="build-subtitle" class="text-[11px] text-stone-400 mt-1">01 · The Grand Helix &amp; Starburst</p>
+      </div>
+
+      <div class="h-7 w-px bg-white/10 hidden sm:block"></div>
+
+      <!-- Counter -->
+      <div class="flex items-center gap-3">
+        <div class="text-right">
+          <div class="text-[10px] uppercase tracking-wider text-stone-400">Fallen</div>
+          <div class="text-sm sm:text-base font-semibold text-amber-100 tabular-nums">
+            <span id="stat-fallen">0</span><span class="text-stone-500 font-normal"> / <span id="stat-total">0</span></span>
+          </div>
+        </div>
+        <!-- Progress Ring -->
+        <svg class="w-8 h-8 -rotate-90" viewBox="0 0 36 36">
+          <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3"></circle>
+          <circle id="progress-ring" cx="18" cy="18" r="14" fill="none" stroke="#fbbf24" stroke-width="3" stroke-dasharray="87.96" stroke-dashoffset="87.96" stroke-linecap="round"></circle>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Top Right Utility Controls: Audio & Cinema Mode -->
+    <div class="flex items-center gap-2 pointer-events-auto">
+      <button id="btn-audio" title="Toggle Procedural Foley Audio" class="glass-pill rounded-xl p-2.5 sm:px-3.5 sm:py-2.5 text-stone-200 hover:text-white hover:bg-white/10 transition flex items-center gap-2 text-xs font-medium">
+        <svg id="icon-audio-on" class="w-4 h-4 text-amber-300" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/>
+        </svg>
+        <svg id="icon-audio-off" class="w-4 h-4 text-stone-400 hidden" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/>
+        </svg>
+        <span class="hidden sm:inline">Foley Sound</span>
+      </button>
+
+      <button id="btn-hide-ui" title="Cinema Mode (Hide UI)" class="glass-pill rounded-xl p-2.5 sm:px-3.5 sm:py-2.5 text-stone-200 hover:text-white hover:bg-white/10 transition flex items-center gap-2 text-xs font-medium">
+        <svg class="w-4 h-4 text-amber-200" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+        </svg>
+        <span class="hidden sm:inline">Cinema Mode</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Floating Restore UI Pill (Shown only in Cinema Mode) -->
+  <button id="btn-show-ui" class="fixed top-4 right-4 z-30 glass-pill rounded-full px-4 py-2 text-xs font-medium text-amber-100 hover:bg-white/15 transition hidden items-center gap-2 shadow-lg">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+    <span>Show Studio Controls</span>
+  </button>
+
+  <!-- Subtle Interactive Hint Toast -->
+  <div id="hint-toast" class="fixed top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-opacity duration-500">
+    <div class="glass-pill rounded-full px-4 py-1.5 text-[11px] text-amber-100/90 tracking-wide flex items-center gap-2 shadow-lg">
+      <span class="w-1.5 h-1.5 rounded-full bg-amber-300 animate-ping"></span>
+      <span>Tap <strong>any domino</strong> to tip it, or press <strong>Topple</strong> · open <strong>Library</strong> for more boards</span>
+    </div>
+  </div>
+
+  <!-- Bottom dock: one slim row. Panels (Library / Build / Studio) open above it, one at a time. -->
+  <footer id="hud-bottom" class="fixed bottom-0 left-0 right-0 z-20 p-3 sm:p-5 flex flex-col items-center gap-2 pointer-events-none transition-all duration-300">
+
+    <div id="sheet" class="hidden glass-panel rounded-3xl p-3 sm:p-4 w-full max-w-xl pointer-events-auto max-h-[52vh] overflow-y-auto no-scrollbar">
+
+      <!-- LIBRARY -->
+      <div id="sheet-library" class="hidden">
+        <details class="sheet-sec" open>
+          <summary>Featured boards</summary>
+          <div class="flex flex-wrap gap-1.5 pt-2.5">
+            <button data-build="0" class="build-btn btn-active rounded-xl px-3 py-2 text-xs font-medium border transition">01 · Grand Helix</button>
+            <button data-build="1" class="build-btn btn-idle rounded-xl px-3 py-2 text-xs font-medium border transition">02 · Viaduct &amp; Steps</button>
+            <button data-build="2" class="build-btn btn-idle rounded-xl px-3 py-2 text-xs font-medium border transition">03 · Kinetic Mandala</button>
+            <button data-build="3" class="build-btn btn-idle rounded-xl px-3 py-2 text-xs font-medium border transition">04 · Cathedral Wall</button>
+            <button data-build="4" class="build-btn btn-idle rounded-xl px-3 py-2 text-xs font-medium border transition">05 · Grand Finale</button>
+          </div>
+        </details>
+
+        <details class="sheet-sec">
+          <summary>Pattern generator <span class="normal-case tracking-normal text-stone-500">tap again for a new one, or mix 2–3</span></summary>
+          <div class="pt-2.5 flex flex-col gap-2.5">
+            <div class="flex flex-wrap gap-1.5">
+              <button data-pat="snake" class="pat-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Switchback</button>
+              <button data-pat="spiral" class="pat-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Spiral</button>
+              <button data-pat="bloom" class="pat-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Bloom</button>
+              <button data-pat="tree" class="pat-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Fractal Tree</button>
+              <button data-pat="mandala" class="pat-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Mandala</button>
+              <button data-pat="fishbone" class="pat-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Fishbone</button>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="flex items-center bg-black/30 rounded-lg p-0.5 border border-white/10">
+                <button data-size="0" class="size-btn text-stone-300 hover:text-white rounded-md px-2.5 py-1 text-[11px] font-medium transition">Small</button>
+                <button data-size="1" class="size-btn btn-active rounded-md px-2.5 py-1 text-[11px] font-medium transition">Medium</button>
+                <button data-size="2" class="size-btn text-stone-300 hover:text-white rounded-md px-2.5 py-1 text-[11px] font-medium transition">Large</button>
+              </div>
+              <button id="tg-combine" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition" aria-pressed="false">Combine 2–3</button>
+              <button id="btn-reroll" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition hidden">Re-roll</button>
+              <button id="btn-surprise" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition">Surprise me</button>
+            </div>
+            <div class="flex items-center justify-between gap-2 text-[11px] text-stone-400">
+              <span id="pat-info">Pick a pattern to generate a board.</span>
+              <span class="flex gap-3 shrink-0">
+                <button id="btn-pat-save" class="hover:text-amber-200 transition">Save</button>
+                <button id="btn-pat-share" class="hover:text-amber-200 transition">Copy link</button>
+              </span>
+            </div>
+          </div>
+        </details>
+
+        <details class="sheet-sec">
+          <summary>My boards <span id="saved-count" class="normal-case tracking-normal text-stone-500"></span></summary>
+          <div id="saved-list" class="pt-2.5 flex flex-col gap-1.5"></div>
+        </details>
+      </div>
+
+      <!-- BUILD -->
+      <div id="sheet-build" class="hidden">
+        <p class="text-[11px] text-stone-300 leading-relaxed">Drag on the floor to lay a line of dominoes. Start a drag <strong class="text-amber-100">beside a piece</strong> to fork a branch off it. Pinch or scroll to zoom.</p>
+        <div class="flex items-center justify-between gap-2 flex-wrap mt-2.5">
+          <span class="text-xs text-stone-300 tabular-nums"><span id="build-count">0</span> / <span id="build-cap">300</span> pieces</span>
+          <div class="flex gap-1.5">
+            <button id="btn-undo" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition">Undo</button>
+            <button id="btn-clear" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition">Clear</button>
+            <button id="btn-build-save" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition">Save</button>
+            <button id="btn-build-share" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition">Copy link</button>
+            <button id="btn-build-done" class="btn-active border rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition">Done</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STUDIO -->
+      <div id="sheet-studio" class="hidden">
+        <details class="sheet-sec" open>
+          <summary>Camera &amp; speed</summary>
+          <div class="pt-2.5 flex flex-col gap-2.5">
+            <div class="flex flex-wrap gap-1.5">
+              <button data-cam="wave" class="cam-btn btn-active rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Wave Tracker</button>
+              <button data-cam="macro" class="cam-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Low Macro</button>
+              <button data-cam="overhead" class="cam-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Architect Top</button>
+              <button data-cam="orbit" class="cam-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Free Orbit</button>
+            </div>
+            <div class="flex items-center bg-black/30 rounded-lg p-0.5 border border-white/10 self-start">
+              <button data-speed="1.0" class="speed-btn btn-active rounded-md px-2.5 py-1 text-[11px] font-medium transition">1.0×</button>
+              <button data-speed="0.5" class="speed-btn text-stone-300 hover:text-white rounded-md px-2.5 py-1 text-[11px] font-medium transition">0.5×</button>
+              <button data-speed="0.25" class="speed-btn text-stone-300 hover:text-white rounded-md px-2.5 py-1 text-[11px] font-medium transition" title="Bullet-time slow motion">0.25×</button>
+            </div>
+          </div>
+        </details>
+        <details class="sheet-sec">
+          <summary>Material &amp; sound</summary>
+          <div class="pt-2.5 flex flex-col gap-3">
+            <div class="flex items-center gap-2.5" title="Domino material finish">
+              <button data-mat="resin" class="mat-btn ring-2 ring-amber-300 ring-offset-2 ring-offset-stone-900 rounded-full w-6 h-6 transition overflow-hidden shadow-md" style="background: linear-gradient(135deg, #fbf8f3 50%, #262322 50%);" title="Polished resin &amp; gold"></button>
+              <button data-mat="wood" class="mat-btn opacity-75 hover:opacity-100 rounded-full w-6 h-6 transition overflow-hidden shadow-md" style="background: linear-gradient(135deg, #deb887 50%, #5c3a21 50%);" title="Beechwood &amp; walnut"></button>
+              <button data-mat="ceramic" class="mat-btn opacity-75 hover:opacity-100 rounded-full w-6 h-6 transition overflow-hidden shadow-md" style="background: linear-gradient(135deg, #8da399 50%, #c87d65 50%);" title="Matte ceramic"></button>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <button id="tg-chimes" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition" title="A soft rising note on each impact">Chimes</button>
+              <button id="tg-haptics" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition" title="Short vibration pulses (phones that support it)">Haptics</button>
+            </div>
+          </div>
+        </details>
+        <details class="sheet-sec">
+          <summary>Ambient</summary>
+          <div class="pt-2.5 flex flex-col gap-1.5">
+            <button id="tg-zen" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition self-start" title="Endless loop: build a new board, topple it, rest, repeat">Zen loop</button>
+            <p class="text-[11px] text-stone-500 leading-relaxed">Builds a fresh pattern, topples it, rests, then starts again. Tap anything to stop.</p>
+          </div>
+        </details>
+        <details class="sheet-sec">
+          <summary>Backup &amp; app <span id="bk-dot" class="normal-case tracking-normal text-amber-300 hidden">· back up</span></summary>
+          <div class="pt-2.5 flex flex-col gap-2.5">
+            <p id="bk-status" class="text-[11px] text-stone-400 leading-relaxed"></p>
+            <div class="flex flex-wrap gap-1.5">
+              <button id="btn-bk-export" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition">Back up now</button>
+              <button id="btn-bk-import" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition">Restore from file</button>
+              <button id="btn-install" class="btn-active border rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition hidden">Install app</button>
+              <input id="bk-file" type="file" accept="application/json,.json" class="hidden" />
+            </div>
+            <p id="bk-hint" class="text-[11px] text-stone-500 leading-relaxed">Saved boards live in this browser only. A backup file keeps them safe if you clear site data or switch phones. Restoring merges into what you have and never deletes anything.</p>
+            <div class="flex items-center justify-between text-[10px] text-stone-500">
+              <span>Atelier Domino v<span id="app-ver"></span> · LAZLAB Creations</span>
+              <a href="mailto:lazlab.io@gmail.com?subject=Atelier%20Domino" class="hover:text-amber-200 transition">Note to self</a>
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="glass-panel rounded-2xl p-2 pointer-events-auto flex items-center gap-1.5 sm:gap-2 w-full max-w-xl">
+      <button id="tab-library" class="dock-tab btn-idle border rounded-xl px-3 py-2.5 text-xs font-medium transition flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h7v7H4zM13 6h7v7h-7zM4 15h7v3H4zM13 15h7v3h-7z"/></svg>
+        <span>Library</span>
+      </button>
+      <button id="btn-build" class="dock-tab btn-idle border rounded-xl px-3 py-2.5 text-xs font-medium transition flex items-center gap-1.5" title="Draw your own board">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M9 13l-1 4 4-1 9.5-9.5a2.5 2.5 0 00-3.5-3.5L9 13z"/></svg>
+        <span>Build</span>
+      </button>
+      <button id="btn-trigger" class="flex-1 bg-gradient-to-r from-amber-200 via-amber-100 to-orange-100 hover:from-white hover:to-amber-50 text-stone-900 font-semibold text-xs px-4 py-2.5 rounded-xl shadow-[0_6px_24px_rgba(251,191,36,0.28)] active:scale-[0.98] transition flex items-center justify-center gap-2">
+        <svg class="w-4 h-4 text-amber-800" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        <span>Topple</span>
+      </button>
+      <button id="btn-reset" class="btn-idle border rounded-xl px-3 py-2.5 text-xs font-medium transition flex items-center justify-center gap-1.5" title="Stand everything back up">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <span class="hidden sm:inline">Reset</span>
+      </button>
+      <button id="tab-studio" class="dock-tab btn-idle border rounded-xl px-3 py-2.5 text-xs font-medium transition flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+        <span class="hidden sm:inline">Studio</span>
+      </button>
+    </div>
+  </footer>
+
+  <div id="toast" class="fixed bottom-32 left-1/2 -translate-x-1/2 z-40 glass-pill rounded-full px-4 py-2 text-xs text-amber-100 opacity-0 pointer-events-none transition-opacity duration-300"></div>
+
+  <!-- Main Application Script -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+    import * as CANNON from 'cannon-es';
+
+    // =========================================================================
+    // 1. PROCEDURAL VELOCITY-MAPPED WEB AUDIO FOLEY SYNTHESIZER
+    // =========================================================================
+    class ProceduralFoleyAudio {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+        this.materialType = 'resin';
+        this.timeScale = 1.0;
+        this.lastTriggerTime = 0;
+        this.activeVoices = 0;
+        this.chimes = false;      // soft pentatonic note per impact, rising along the chain
+        this.haptics = false;    // short vibration pulses (phones that support it)
+        this.lastNote = 0;
+        this.lastBuzz = 0;
+      }
+
+      // A quiet pentatonic note. Pieces are numbered along the chain, so a run of falling dominoes plays a
+      // rising ripple of notes (about 2.6 octaves across the whole board).
+      playNote(order, total, velocity) {
+        if (!this.enabled || !this.chimes || !this.ctx || this.ctx.state !== 'running') return;
+        const now = this.ctx.currentTime;
+        if (now - this.lastNote < 0.05 || this.activeVoices > 16) return;
+        this.lastNote = now;
+        const t = Math.min(1, Math.max(0, order / Math.max(1, total - 1)));
+        const n = Math.round(t * 13);
+        const semis = [0, 2, 4, 7, 9][n % 5] + 12 * Math.floor(n / 5);
+        const f = 261.63 * Math.pow(2, semis / 12) * (0.72 + 0.28 * this.timeScale);
+        const vel = Math.min(1, Math.max(0.1, (velocity - 0.5) / 5));
+        const g = 0.02 + 0.03 * vel;
+        const osc = this.ctx.createOscillator(), osc2 = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine'; osc2.type = 'sine';
+        osc.frequency.value = f; osc2.frequency.value = f * 2.005;
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(g, now + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+        const g2 = this.ctx.createGain(); g2.gain.value = 0.22;
+        osc.connect(gain); osc2.connect(g2); g2.connect(gain);
+        gain.connect(this.ctx.destination);
+        this.activeVoices++;
+        osc.start(now); osc2.start(now);
+        osc.stop(now + 0.65); osc2.stop(now + 0.65);
+        osc.onended = () => { this.activeVoices = Math.max(0, this.activeVoices - 1); };
+      }
+
+      buzz(velocity) {
+        if (!this.haptics || typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
+        const t = performance.now();
+        if (t - this.lastBuzz < 70) return;
+        this.lastBuzz = t;
+        navigator.vibrate(Math.min(14, Math.round(4 + velocity * 2)));
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            this.ctx = new AudioCtx();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playImpact(velocity, panX = 0, isFloor = false) {
+        if (!this.enabled || !this.ctx || this.ctx.state !== 'running') return;
+        const now = this.ctx.currentTime;
+        if (now - this.lastTriggerTime < 0.014 || this.activeVoices > 18) return;
+        this.lastTriggerTime = now;
+
+        const normVel = Math.min(1, Math.max(0.05, (velocity - 0.5) / 6.5));
+        const gainVal = Math.pow(normVel, 1.35) * (isFloor ? 0.14 : 0.24);
+        if (gainVal < 0.008) return;
+
+        this.activeVoices++;
+
+        const osc = this.ctx.createOscillator();
+        const clickOsc = this.ctx.createOscillator();
+        const filter = this.ctx.createBiquadFilter();
+        const gain = this.ctx.createGain();
+        const panner = this.ctx.createStereoPanner();
+
+        panner.pan.value = Math.max(-0.85, Math.min(0.85, panX / 9));
+
+        const pitchJitter = 0.93 + Math.random() * 0.14;
+        const slowMoPitch = 0.72 + 0.28 * this.timeScale;
+
+        let baseFreq = 1180;
+        let clickFreq = 3200;
+        let qVal = 4.2;
+        let decay = 0.042;
+
+        if (this.materialType === 'wood') {
+          baseFreq = isFloor ? 520 : 760;
+          clickFreq = 1850;
+          qVal = 2.8;
+          decay = 0.052;
+        } else if (this.materialType === 'ceramic') {
+          baseFreq = isFloor ? 1320 : 1960;
+          clickFreq = 4400;
+          qVal = 7.5;
+          decay = 0.065;
+        } else {
+          baseFreq = isFloor ? 880 : 1280;
+          clickFreq = 3400;
+          qVal = 4.5;
+          decay = 0.044;
+        }
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(baseFreq * pitchJitter * slowMoPitch, now);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.42 * slowMoPitch, now + decay);
+
+        clickOsc.type = 'sine';
+        clickOsc.frequency.setValueAtTime(clickFreq * pitchJitter * slowMoPitch, now);
+        clickOsc.frequency.exponentialRampToValueAtTime(600, now + decay * 0.45);
+
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(baseFreq * 1.35, now);
+        filter.Q.value = qVal;
+
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(gainVal, now + 0.002);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+
+        osc.connect(filter);
+        clickOsc.connect(filter);
+        filter.connect(gain);
+        gain.connect(panner);
+        panner.connect(this.ctx.destination);
+
+        osc.start(now);
+        clickOsc.start(now);
+        osc.stop(now + decay + 0.01);
+        clickOsc.stop(now + decay + 0.01);
+
+        osc.onended = () => {
+          this.activeVoices = Math.max(0, this.activeVoices - 1);
+        };
+      }
+    }
+
+    const foley = new ProceduralFoleyAudio();
+
+    // =========================================================================
+    // 2. THREE.JS SUNLIT ARCHITECTURAL STUDIO SCENE & POST-PROCESSING
+    // =========================================================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#e9dfd1');
+    scene.fog = new THREE.FogExp2('#e9dfd1', 0.013);
+
+    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(10.5, 8.2, 12.2);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.96;
+    container.appendChild(renderer.domElement);
+
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environmentIntensity = 0.48;
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI * 0.485;
+    controls.minDistance = 2.0;
+    controls.maxDistance = 110;
+
+    // Warm Golden-Hour Window Sunlight + Rich Architectural Contrast
+    const hemiLight = new THREE.HemisphereLight('#fff5e6', '#8c7258', 0.55);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight('#ffefd6', 2.05);
+    sunLight.position.set(11, 18, 9);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.camera.near = 2;
+    sunLight.shadow.camera.far = 60;
+    const dShadow = 17;
+    sunLight.shadow.camera.left = -dShadow;
+    sunLight.shadow.camera.right = dShadow;
+    sunLight.shadow.camera.top = dShadow;
+    sunLight.shadow.camera.bottom = -dShadow;
+    sunLight.shadow.bias = -0.00035;
+    sunLight.shadow.normalBias = 0.018;
+    scene.add(sunLight);
+
+    const rimLight = new THREE.DirectionalLight('#cbd5e1', 0.42);
+    rimLight.position.set(-12, 9, -10);
+    scene.add(rimLight);
+
+    // High-DPI Multisampled Post-Processing Composer (prevents low-res blur & double tone-mapping washout)
+    const renderTarget = new THREE.WebGLRenderTarget(
+      window.innerWidth * renderer.getPixelRatio(),
+      window.innerHeight * renderer.getPixelRatio(),
+      { samples: 4, type: THREE.HalfFloatType }
+    );
+    const composer = new EffectComposer(renderer, renderTarget);
+    composer.setPixelRatio(renderer.getPixelRatio());
+    composer.setSize(window.innerWidth, window.innerHeight);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.08,
+      0.4,
+      0.92
+    );
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+
+    // =========================================================================
+    // 3. PROCEDURAL PBR OAK FLOOR TEXTURES & ARCHITECTURAL PLINTH MATERIAL
+    // =========================================================================
+    function createOakFloorTextures() {
+      const size = 1024;
+      const diffCanvas = document.createElement('canvas');
+      const roughCanvas = document.createElement('canvas');
+      const bumpCanvas = document.createElement('canvas');
+      diffCanvas.width = roughCanvas.width = bumpCanvas.width = size;
+      diffCanvas.height = roughCanvas.height = bumpCanvas.height = size;
+
+      const dCtx = diffCanvas.getContext('2d');
+      const rCtx = roughCanvas.getContext('2d');
+      const bCtx = bumpCanvas.getContext('2d');
+
+      const plankRows = 8;
+      const plankH = size / plankRows;
+
+      for (let row = 0; row < plankRows; row++) {
+        const y = row * plankH;
+        const offset = (row % 2) * (size * 0.5) + (Math.sin(row * 13.7) * 90);
+        const plankCols = 2;
+        const plankW = size / plankCols;
+
+        for (let col = -1; col <= plankCols; col++) {
+          const x = col * plankW + (offset % plankW);
+          const toneShift = ((row * 7 + col * 13) % 5) * 4 - 8;
+          const r = 186 + toneShift;
+          const g = 154 + toneShift;
+          const b = 122 + toneShift;
+
+          dCtx.fillStyle = `rgb(${r},${g},${b})`;
+          dCtx.fillRect(x, y, plankW, plankH);
+
+          const roughBase = 135 + ((row + col) % 3) * 14;
+          rCtx.fillStyle = `rgb(${roughBase},${roughBase},${roughBase})`;
+          rCtx.fillRect(x, y, plankW, plankH);
+
+          bCtx.fillStyle = 'rgb(140,140,140)';
+          bCtx.fillRect(x, y, plankW, plankH);
+
+          // Subtle organic wood grain streaks
+          for (let gLine = 0; gLine < 26; gLine++) {
+            const gy = y + (gLine / 26) * plankH;
+            dCtx.strokeStyle = `rgba(145, 112, 78, ${0.04 + (gLine % 4) * 0.015})`;
+            dCtx.lineWidth = 1.2;
+            dCtx.beginPath();
+            dCtx.moveTo(x, gy);
+            dCtx.bezierCurveTo(
+              x + plankW * 0.33, gy + Math.sin(gLine + row) * 2.5,
+              x + plankW * 0.66, gy - Math.cos(gLine + col) * 2.5,
+              x + plankW, gy
+            );
+            dCtx.stroke();
+
+            bCtx.strokeStyle = 'rgba(115,115,115,0.22)';
+            bCtx.lineWidth = 1;
+            bCtx.beginPath();
+            bCtx.moveTo(x, gy);
+            bCtx.lineTo(x + plankW, gy);
+            bCtx.stroke();
+          }
+
+          // Plank bevel seams
+          dCtx.strokeStyle = 'rgba(110, 86, 62, 0.38)';
+          dCtx.lineWidth = 2;
+          dCtx.strokeRect(x + 1, y + 1, plankW - 2, plankH - 2);
+
+          bCtx.strokeStyle = 'rgb(60,60,60)';
+          bCtx.lineWidth = 2.5;
+          bCtx.strokeRect(x + 1, y + 1, plankW - 2, plankH - 2);
+        }
+      }
+
+      const wrap = (tex, isSRGB = false) => {
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(9, 9);
+        tex.anisotropy = 8;
+        if (isSRGB) tex.colorSpace = THREE.SRGBColorSpace;
+        return tex;
+      };
+
+      return {
+        map: wrap(new THREE.CanvasTexture(diffCanvas), true),
+        roughnessMap: wrap(new THREE.CanvasTexture(roughCanvas)),
+        bumpMap: wrap(new THREE.CanvasTexture(bumpCanvas))
+      };
+    }
+
+    const oakTextures = createOakFloorTextures();
+    const floorMat = new THREE.MeshStandardMaterial({
+      map: oakTextures.map,
+      roughnessMap: oakTextures.roughnessMap,
+      bumpMap: oakTextures.bumpMap,
+      bumpScale: 0.008,
+      roughness: 0.62,
+      metalness: 0.02
+    });
+
+    const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(75, 75), floorMat);
+    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
+
+    const plinthMat = new THREE.MeshStandardMaterial({
+      color: '#d6c8b6',
+      roughness: 0.55,
+      metalness: 0.05
+    });
+
+    // =========================================================================
+    // 4. CHAMFERED BEVELED DOMINO GEOMETRY & TACTILE PBR PALETTES
+    // =========================================================================
+    const DOMINO_W = 0.44;
+    const DOMINO_H = 0.88;
+    const DOMINO_D = 0.125;   // real-domino proportions (24:48:7 ~ 0.44:0.88:0.125)
+
+    // Collider == visible mesh. (Before: mesh was 0.095 thick but the collider 0.125, so pieces looked like
+    // they stopped 1.5cm short of each other and stacked pieces floated / interpenetrated.)
+    const COLLIDER_W = DOMINO_W;
+    const COLLIDER_H = DOMINO_H;
+    const COLLIDER_D = DOMINO_D;
+
+    function createBeveledDominoGeometry(w, h, d) {
+      const r = 0.032;
+      const bevel = 0.012;
+      const shape = new THREE.Shape();
+      const hw = w * 0.5 - bevel;
+      const hh = h * 0.5 - bevel;
+
+      shape.moveTo(-hw + r, -hh);
+      shape.lineTo(hw - r, -hh);
+      shape.quadraticCurveTo(hw, -hh, hw, -hh + r);
+      shape.lineTo(hw, hh - r);
+      shape.quadraticCurveTo(hw, hh, hw - r, hh);
+      shape.lineTo(-hw + r, hh);
+      shape.quadraticCurveTo(-hw, hh, -hw, hh - r);
+      shape.lineTo(-hw, -hh + r);
+      shape.quadraticCurveTo(-hw, -hh, -hw + r, -hh);
+
+      const geo = new THREE.ExtrudeGeometry(shape, {
+        depth: d - bevel * 2,
+        bevelEnabled: true,
+        bevelThickness: bevel,
+        bevelSize: bevel,
+        bevelSegments: 3,
+        curveSegments: 8
+      });
+      geo.center();
+      geo.computeVertexNormals();
+      return geo;
+    }
+
+    const dominoGeo = createBeveledDominoGeometry(DOMINO_W, DOMINO_H, DOMINO_D);
+
+    let currentMaterialKey = 'resin';
+    const MATERIAL_PALETTES = {
+      resin: [
+        new THREE.MeshPhysicalMaterial({ color: '#f7f3eb', roughness: 0.18, metalness: 0.02, clearcoat: 0.85, clearcoatRoughness: 0.12 }),
+        new THREE.MeshPhysicalMaterial({ color: '#2b2826', roughness: 0.22, metalness: 0.05, clearcoat: 0.85, clearcoatRoughness: 0.14 }),
+        new THREE.MeshPhysicalMaterial({ color: '#d4a359', roughness: 0.26, metalness: 0.65, clearcoat: 0.6, clearcoatRoughness: 0.18 })
+      ],
+      wood: [
+        new THREE.MeshStandardMaterial({ color: '#dfb887', roughness: 0.48, metalness: 0.02 }),
+        new THREE.MeshStandardMaterial({ color: '#6b442a', roughness: 0.52, metalness: 0.02 }),
+        new THREE.MeshStandardMaterial({ color: '#b57c4a', roughness: 0.45, metalness: 0.04 })
+      ],
+      ceramic: [
+        new THREE.MeshPhysicalMaterial({ color: '#8ea399', roughness: 0.68, metalness: 0.0, clearcoat: 0.12 }),
+        new THREE.MeshPhysicalMaterial({ color: '#c77d63', roughness: 0.68, metalness: 0.0, clearcoat: 0.12 }),
+        new THREE.MeshPhysicalMaterial({ color: '#ebe4d8', roughness: 0.62, metalness: 0.0, clearcoat: 0.18 })
+      ]
+    };
+
+    // =========================================================================
+    // 5. CANNON-ES RIGID BODY PHYSICS WORLD (120Hz fixed step, tuned in a headless sim)
+    // =========================================================================
+    // Hard-won facts for domino chains in cannon-es:
+    //  * cannon-es friction is a constant-force clamp (mu * |g| * reducedMass), NOT mu * normalForce.
+    //    A leaning domino presses on its neighbour with ~1N, so even mu = 0.05 between dominoes behaves like
+    //    glue: the falling piece sticks to the next one and the whole chain stalls after 2-3 pieces.
+    //    => domino<->domino friction MUST be 0. Floor friction stays high so the bottom edge hinges, not slides.
+    //  * Sleeping bodies are immovable during the first contact step and (with SAPBroadphase) can be skipped
+    //    entirely, so the falling piece passed straight THROUGH the sleeping one next to it. Nothing sleeps now.
+    //  * NaiveBroadphase is plenty for ~250 bodies and has no sorted-axis edge cases.
+    const FIXED_TIMESTEP = 1 / 120;
+    const MAX_SUBSTEPS_PER_FRAME = 6;   // 6 x 1/120 = 50ms == the frame-time clamp in animate()
+    const world = new CANNON.World();
+    world.gravity.set(0, -19.6, 0);
+    world.broadphase = new CANNON.NaiveBroadphase();
+    world.allowSleep = false;
+    world.solver.iterations = 12;
+    world.solver.tolerance = 0.001;
+
+    const physFloorMat = new CANNON.Material('floor');
+    const physDominoMat = new CANNON.Material('domino');
+    const physStackMat = new CANNON.Material('stack');   // pillars/lintels of the Cathedral wall (frictional so it can stand)
+
+    // High floor grip plants the bottom edge as a clean pivot hinge without sliding
+    world.addContactMaterial(new CANNON.ContactMaterial(physFloorMat, physDominoMat, {
+      friction: 1.0,
+      restitution: 0.0,
+      contactEquationStiffness: 1e7,
+      contactEquationRelaxation: 3,
+      frictionEquationStiffness: 1e7,
+      frictionEquationRelaxation: 3
+    }));
+    world.addContactMaterial(new CANNON.ContactMaterial(physFloorMat, physStackMat, {
+      friction: 1.0, restitution: 0.0, contactEquationStiffness: 1e9, contactEquationRelaxation: 4,
+      frictionEquationStiffness: 1e9, frictionEquationRelaxation: 4
+    }));
+    world.addContactMaterial(new CANNON.ContactMaterial(physStackMat, physStackMat, {
+      friction: 0.6, restitution: 0.0, contactEquationStiffness: 1e9, contactEquationRelaxation: 4,
+      frictionEquationStiffness: 1e9, frictionEquationRelaxation: 4
+    }));
+    world.addContactMaterial(new CANNON.ContactMaterial(physStackMat, physDominoMat, {
+      friction: 0.0, restitution: 0.0, contactEquationStiffness: 1e7, contactEquationRelaxation: 3,
+      frictionEquationStiffness: 1e7, frictionEquationRelaxation: 3
+    }));
+    // Frictionless face contact: the falling piece transfers its momentum through the contact normal only
+    world.addContactMaterial(new CANNON.ContactMaterial(physDominoMat, physDominoMat, {
+      friction: 0.0,
+      restitution: 0.0,
+      contactEquationStiffness: 1e7,
+      contactEquationRelaxation: 3,
+      frictionEquationStiffness: 1e7,
+      frictionEquationRelaxation: 3
+    }));
+
+    // Static Floor Body
+    const floorBody = new CANNON.Body({
+      mass: 0,
+      material: physFloorMat,
+      shape: new CANNON.Plane()
+    });
+    floorBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+    world.addBody(floorBody);
+
+    // =========================================================================
+    // 6. DOMINO & ARCHITECTURAL BUILD GENERATOR
+    // =========================================================================
+    let dominoes = [];
+    let staticProps = [];
+    let starterDomino = null;
+    let currentBuildIndex = 0;
+    let isToppling = false;
+    let fallenCount = 0;
+
+    // Subtle Golden Ring Indicator Around the Starter Domino
+    const starterRingGeo = new THREE.RingGeometry(0.32, 0.39, 32);
+    starterRingGeo.rotateX(-Math.PI / 2);
+    const starterRingMat = new THREE.MeshBasicMaterial({
+      color: '#fbbf24',
+      transparent: true,
+      opacity: 0.75,
+      side: THREE.DoubleSide
+    });
+    const starterRing = new THREE.Mesh(starterRingGeo, starterRingMat);
+    starterRing.position.y = 0.008;
+    scene.add(starterRing);
+
+    // Subtle Hover Ring Indicator for Interactive Mid-Line Tapping
+    const hoverRingGeo = new THREE.RingGeometry(0.28, 0.34, 32);
+    hoverRingGeo.rotateX(-Math.PI / 2);
+    const hoverRingMat = new THREE.MeshBasicMaterial({
+      color: '#fde68a',
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide
+    });
+    const hoverRing = new THREE.Mesh(hoverRingGeo, hoverRingMat);
+    hoverRing.position.y = 0.009;
+    hoverRing.visible = false;
+    scene.add(hoverRing);
+
+    function clearWorld() {
+      for (const d of dominoes) {
+        scene.remove(d.mesh);
+        if (d.inWorld) world.removeBody(d.body);
+      }
+      for (const p of staticProps) {
+        scene.remove(p.mesh);
+        if (p.body) world.removeBody(p.body);
+      }
+      dominoes = [];
+      staticProps = [];
+      starterDomino = null;
+      isToppling = false;
+      fallenCount = 0;
+      physAccumulator = 0;
+      hoverRing.visible = false;
+      updateStatsUI();
+    }
+
+    function addPlinth(x, y, z, w, h, d) {
+      const geo = new THREE.BoxGeometry(w, h, d);
+      const mesh = new THREE.Mesh(geo, plinthMat);
+      mesh.position.set(x, y + h * 0.5, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+
+      const body = new CANNON.Body({
+        mass: 0,
+        material: physFloorMat,
+        shape: new CANNON.Box(new CANNON.Vec3(w * 0.5, h * 0.5, d * 0.5))
+      });
+      body.position.set(x, y + h * 0.5, z);
+      world.addBody(body);
+
+      staticProps.push({ mesh, body });
+    }
+
+    // ---- Active-set simulation ------------------------------------------------------------------
+    // Simulating every piece at once costs 3-4ms per physics step on a 200-piece board. Instead, pieces only
+    // live in the physics world while they're near motion: dormant pieces are woken (added to the world) as soon
+    // as a moving piece comes within `wakeRadius`, and fallen pieces that have settled are retired (removed).
+    // Unlike cannon's own sleeping, a woken piece is a normal awake body *before* anything touches it, so the
+    // first impact transfers real momentum (a sleeping body acts as an immovable wall for the first step).
+    let wakeRadius = 1.8;
+    let retireEnabled = true;
+    const _up = new CANNON.Vec3(0, 1, 0);
+    const _tmp = new CANNON.Vec3();
+
+    function enterWorld(d) {
+      if (d.inWorld) return;
+      world.addBody(d.body);
+      d.inWorld = true;
+      d.retired = false;
+      d.calm = 0;
+      // Standing structures (the Cathedral wall) are one rigid-ish assembly: a tall stack of 0.125 m-thick pillars
+      // is a delicate inverted pendulum, so it must not be simulated until the fuse is about to reach it.
+      // When any piece of it wakes, all of it wakes together.
+      if (d.body.material === physStackMat) {
+        for (const o of dominoes) if (o !== d && !o.inWorld && o.body.material === physStackMat) enterWorld(o);
+      }
+    }
+    function leaveWorld(d) {
+      if (!d.inWorld) return;
+      world.removeBody(d.body);
+      d.body.velocity.set(0, 0, 0);
+      d.body.angularVelocity.set(0, 0, 0);
+      d.inWorld = false;
+      d.retired = true;
+    }
+    function computeNeighbors(radius) {
+      const r2 = radius * radius;
+      for (const a of dominoes) {
+        a.neighbors = [];
+        const pa = a.body.position;
+        for (const b of dominoes) {
+          if (a === b) continue;
+          const pb = b.body.position;
+          const dx = pa.x - pb.x, dy = pa.y - pb.y, dz = pa.z - pb.z;
+          if (dx * dx + dy * dy + dz * dz <= r2) a.neighbors.push(b);
+        }
+      }
+    }
+    function updateActiveSet(dt) {
+      for (const d of dominoes) {
+        if (!d.inWorld) continue;
+        const b = d.body;
+        b.quaternion.vmult(_up, _tmp);
+        d.upY = _tmp.y;
+        if (!d.isLintel && d.upY < 0.58 && !d.fallen) d.fallen = true;
+        // Frictionless faces mean a fallen pile would keep creeping; a little extra drag lets it settle. Only once the
+        // piece is lying (nearly) flat: a piece still mid-fall, or leaning on the next one, must keep its momentum.
+        if (!d.isLintel && d.upY < 0.3 && !d.damped) {
+          d.damped = true;
+          b.linearDamping = 0.7;
+          b.angularDamping = 0.9;
+        }
+        const e = b.velocity.lengthSquared() + b.angularVelocity.lengthSquared();
+        d.e = e;
+        d.calm = e < 0.01 ? d.calm + dt : 0;
+        if (e > 0.04) {
+          for (const n of d.neighbors) if (!n.inWorld && !n.retired) enterWorld(n);
+        }
+      }
+      if (!retireEnabled) return;
+      for (const d of dominoes) {
+        if (!d.inWorld || !d.damped || d.calm < 0.8) continue;
+        let busy = false;
+        for (const n of d.neighbors) { if (n.inWorld && n.e > 0.3) { busy = true; break; } }
+        if (!busy) leaveWorld(d);
+      }
+    }
+
+    // Fixed-step loop WITHOUT cannon's "break after one slow step and discard the backlog" behaviour
+    // (which silently turned the sim into slow motion on busy boards).
+    let physAccumulator = 0;
+    function stepPhysics(dt) {
+      updateActiveSet(dt);
+      physAccumulator += dt;
+      let n = 0;
+      while (physAccumulator >= FIXED_TIMESTEP && n < MAX_SUBSTEPS_PER_FRAME) {
+        world.step(FIXED_TIMESTEP);
+        physAccumulator -= FIXED_TIMESTEP;
+        n++;
+      }
+      if (physAccumulator >= FIXED_TIMESTEP) physAccumulator = 0; // drop backlog instead of spiralling
+    }
+
+    const TIP_OMEGA = 2.4; // rad/s given to the piece the user starts / taps
+
+    function addDomino(x, y, z, rotY, colorSlot = 0, isStarter = false, scale = 1.0, stack = false) {
+      const palette = MATERIAL_PALETTES[currentMaterialKey];
+      const mat = palette[colorSlot % palette.length];
+
+      const mesh = new THREE.Mesh(dominoGeo, mat);
+      mesh.scale.set(scale, scale, scale);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.position.set(x, y + (DOMINO_H * scale) * 0.5, z);
+      mesh.rotation.y = rotY;
+      scene.add(mesh);
+
+      const shape = new CANNON.Box(new CANNON.Vec3(
+        (COLLIDER_W * scale) * 0.5,
+        (COLLIDER_H * scale) * 0.5,
+        (COLLIDER_D * scale) * 0.5
+      ));
+
+      const dynamicMass = 0.55 * scale * scale;
+      const body = new CANNON.Body({
+        mass: dynamicMass,
+        type: CANNON.Body.DYNAMIC,
+        material: stack ? physStackMat : physDominoMat,
+        shape,
+        linearDamping: 0.01,
+        angularDamping: 0.03,
+        allowSleep: false
+      });
+
+      body.position.set(x, y + (DOMINO_H * scale) * 0.5, z);
+      body.quaternion.setFromEuler(0, rotY, 0);
+      // NOT added to the world yet: pieces join the simulation just ahead of the wave (see active-set below)
+
+      const forwardDir = new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY)).normalize();
+
+      const record = {
+        mesh,
+        body,
+        dynamicMass,
+        activated: false,
+        activatedAt: 0,
+        colorSlot,
+        scale,
+        fallen: false,
+        isStarter,
+        isLintel: false,
+        forwardDir,
+        inWorld: false,
+        retired: false,
+        calm: 0,
+        e: 0,
+        upY: 1,
+        neighbors: [],
+        hx: x, hz: z, hh: rotY,
+        order: dominoes.length,
+        baseScale: mesh.scale.clone(),
+        forked: false
+      };
+
+      // Tip the piece over its front-bottom edge. The body is given the velocity of a rigid rotation about that
+      // edge (v = w x r). Spinning it about its centre instead gets mostly absorbed by the floor contact, so
+      // the starter used to hop and settle at ~20 degrees without ever reaching the next piece.
+      record.tip = (dirX, dirZ, omega = TIP_OMEGA) => {
+        const len = Math.hypot(dirX, dirZ);
+        if (len < 1e-6) return;
+        const nx = dirX / len, nz = dirZ / len;
+        if (!record.activated) {
+          record.activated = true;
+          record.activatedAt = performance.now();
+        }
+        enterWorld(record);
+        const w = new CANNON.Vec3(nz * omega, 0, -nx * omega);
+        const r = new CANNON.Vec3(-nx * DOMINO_D * scale * 0.5, DOMINO_H * scale * 0.5, -nz * DOMINO_D * scale * 0.5);
+        body.angularVelocity.copy(w);
+        w.cross(r, body.velocity);
+      };
+
+      // Contacts only drive audio now. Chain propagation is pure physics (no scripted kicks).
+      body.addEventListener('collide', (e) => {
+        const isFloor = e.body === floorBody;
+        const relVel = Math.abs(e.contact.getImpactVelocityAlongNormal());
+        if (relVel > 0.55) {
+          foley.playImpact(relVel, body.position.x, isFloor);
+          if (!isFloor) { foley.playNote(record.order, dominoes.length, relVel); foley.buzz(relVel); }
+        }
+      });
+
+      dominoes.push(record);
+
+      if (isStarter) {
+        starterDomino = record;
+        starterRing.position.set(x, y + 0.008, z);
+        starterRing.visible = true;
+      }
+      return record;
+    }
+
+    // Helper: Place dominoes cleanly spaced along an array of 3D points (0.38m natural spacing)
+    function placeDominoChain(points, spacing = 0.38, colorPatternFn = (i) => i % 2, markFirstStarter = false) {
+      if (points.length < 2) return [];
+      const curve = new THREE.CatmullRomCurve3(points);
+      const totalLen = curve.getLength();
+      const count = Math.max(2, Math.floor(totalLen / spacing));
+      const created = [];
+
+      for (let i = 0; i <= count; i++) {
+        const u = i / count;
+        const pos = curve.getPointAt(u);
+        const tangent = curve.getTangentAt(u);
+        const rotY = Math.atan2(tangent.x, tangent.z);
+        const isStarter = markFirstStarter && i === 0;
+        const rec = addDomino(pos.x, pos.y, pos.z, rotY, colorPatternFn(i), isStarter);
+        created.push(rec);
+      }
+      return created;
+    }
+
+    // =========================================================================
+    // LAYOUT HELPERS
+    // Headings: forward = (sin h, cos h), left = (cos h, -sin h). A positive turn steers LEFT.
+    //
+    // Why these exist: a domino only topples what is physically in front of its broad face. Every junction in the
+    // old boards (ring -> spoke, hub -> starburst ray, fan, wall) either spawned pieces overlapping each other
+    // (explosions the moment they woke) or put the next piece where the falling one could never reach it, so the
+    // chain silently died. All junctions below are built from two patterns that were verified in the headless sim:
+    //   * Y-split   : the last trunk piece falls onto TWO children placed +/-0.27m either side of its centreline.
+    //   * ring peel : a ring piece is replaced by two pieces (ring continues on one side, a branch starts on the
+    //                 other) so a tangentially-falling ring piece hits both.
+    // =========================================================================
+    const PITCH = 0.38;
+    const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+
+    // Hand-steered run: n pieces PITCH apart; heading swings by `turn` (rad, + = left) across the first
+    // `turnPieces` pieces then holds. Returns the records and the pose where the NEXT piece would sit.
+    function steerChain(x, z, h, n, turn = 0, colorFn = (i) => i % 2, o = {}) {
+      const tp = Math.max(2, o.turnPieces ?? n);
+      const recs = [];
+      for (let i = 0; i < n; i++) {
+        const k = Math.min(1, i / (tp - 1));
+        const kMid = Math.min(1, (i + 0.5) / (tp - 1));
+        recs.push(addDomino(x, o.y ?? 0, z, h + turn * k, colorFn(i), !!o.starter && i === 0));
+        x += Math.sin(h + turn * kMid) * PITCH;
+        z += Math.cos(h + turn * kMid) * PITCH;
+      }
+      return { recs, next: { x, z, h: h + turn } };
+    }
+
+    // Y-split: two start poses straddling the centreline of pose p (where the next piece would go).
+    function splitPose(p, off = 0.27, spread = 0.12) {
+      const lx = Math.cos(p.h), lz = -Math.sin(p.h);
+      return [
+        { x: p.x + lx * off, z: p.z + lz * off, h: p.h + spread },  // left
+        { x: p.x - lx * off, z: p.z - lz * off, h: p.h - spread }   // right
+      ];
+    }
+
+    // Slot poses around a circle (centre cx,cz, radius R) starting at polar angle a0.
+    function ringPoses(cx, cz, R, a0, n, cw = false) {
+      const out = [];
+      const da = (PITCH / R) * (cw ? -1 : 1);
+      for (let i = 0; i < n; i++) {
+        const a = a0 + i * da;
+        const dx = cw ? Math.sin(a) : -Math.sin(a);
+        const dz = cw ? -Math.cos(a) : Math.cos(a);
+        out.push({ x: cx + Math.cos(a) * R, z: cz + Math.sin(a) * R, h: Math.atan2(dx, dz) });
+      }
+      return out;
+    }
+
+    // Lay slot poses as a chain. Slots listed in `nodes` become ring peels: {inward: true|false, branch(pose, side)}.
+    // The side the branch leaves on (+1 = left of travel, -1 = right) is derived from the ring centre, so it stays
+    // right whichever way round the ring runs.
+    function layPoses(poses, colorFn, nodes = {}, o = {}) {
+      const recs = [];
+      const [cx, cz] = o.center ?? [0, 0];
+      poses.forEach((p, i) => {
+        const node = nodes[i];
+        if (!node) {
+          recs.push(addDomino(p.x, 0, p.z, p.h, colorFn(i), !!o.starter && i === 0));
+          return;
+        }
+        const lx = Math.cos(p.h), lz = -Math.sin(p.h);
+        const centreOnLeft = (cx - p.x) * lx + (cz - p.z) * lz > 0 ? 1 : -1;
+        const s = node.side ?? (node.inward ? centreOnLeft : -centreOnLeft);
+        const off = node.off ?? 0.27;
+        recs.push(addDomino(p.x - s * lx * off, 0, p.z - s * lz * off, p.h, colorFn(i)));
+        node.branch({ x: p.x + s * lx * off, z: p.z + s * lz * off, h: p.h }, s);
+      });
+      return recs;
+    }
+
+    // Heading that points from (x,z) toward / away from the point (cx,cz)
+    function radialHeading(x, z, cx, cz, inward) {
+      const dx = inward ? cx - x : x - cx, dz = inward ? cz - z : z - cz;
+      return Math.atan2(dx, dz);
+    }
+    // A branch leaving a ring at pose p on side s, swinging onto a radial line, n pieces long.
+    function radialBranch(p, s, cx, cz, inward, n, colorFn, kick = 0.3, turnPieces = 3) {
+      const h0 = p.h + s * kick;
+      const hT = radialHeading(p.x, p.z, cx, cz, inward);
+      return steerChain(p.x, p.z, h0, n, wrapAngle(hT - h0), colorFn, { turnPieces });
+    }
+
+    // Standing pillars / flat lintels for the Cathedral wall use a frictional "stack" material so structures can
+    // actually stand (domino<->domino faces are frictionless, which is what lets chains run).
+    const LINTEL_LEN = 0.80, LINTEL_DEPTH = 0.55;
+    function addLintel(x, yUnder, z) {
+      const palette = MATERIAL_PALETTES[currentMaterialKey];
+      const mesh = new THREE.Mesh(dominoGeo, palette[2]);
+      mesh.scale.set(LINTEL_DEPTH / DOMINO_W, LINTEL_LEN / DOMINO_H, 1);
+      mesh.rotation.set(Math.PI * 0.5, 0, Math.PI * 0.5);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      const cy = yUnder + DOMINO_D * 0.5;
+      mesh.position.set(x, cy, z);
+      scene.add(mesh);
+
+      const body = new CANNON.Body({
+        mass: 0.4,
+        type: CANNON.Body.DYNAMIC,
+        material: physStackMat,
+        shape: new CANNON.Box(new CANNON.Vec3(LINTEL_DEPTH * 0.5, LINTEL_LEN * 0.5, DOMINO_D * 0.5)),
+        linearDamping: 0.02,
+        angularDamping: 0.05,
+        allowSleep: false
+      });
+      body.position.set(x, cy, z);
+      body.quaternion.setFromEuler(Math.PI * 0.5, 0, Math.PI * 0.5);
+
+      const record = {
+        mesh, body, dynamicMass: 0.4, activated: false, activatedAt: 0, colorSlot: 2, scale: 1,
+        fallen: false, isStarter: false, isLintel: true, forwardDir: new THREE.Vector3(0, 0, 1),
+        inWorld: false, retired: false, calm: 0, e: 0, upY: 1, neighbors: [],
+        order: dominoes.length, baseScale: mesh.scale.clone(), forked: false
+      };
+      body.addEventListener('collide', (e) => {
+        const relVel = Math.abs(e.contact.getImpactVelocityAlongNormal());
+        if (relVel > 0.55) foley.playImpact(relVel, body.position.x, e.body === floorBody);
+      });
+      dominoes.push(record);
+      return record;
+    }
+
+    // =========================================================================
+    // 7. CURATED ARCHITECTURAL BUILD LIBRARY (4 STRUCTURES)
+    // =========================================================================
+    const BUILDS = [
+      {
+        title: '01 · The Grand Helix & Starburst',
+        camPos: new THREE.Vector3(10.5, 8.2, 12.2),
+        camTarget: new THREE.Vector3(0, 0.8, 0),
+        build() {
+          // Sweeping approach into an inward Archimedean spiral (spline, 0.38m pitch) ...
+          const RING_R = 2.9, TURNS = 1.8, START_R = 5.5;
+          const pts = [];
+          const leadSteps = 22;
+          for (let i = 0; i < leadSteps; i++) {
+            const t = i / leadSteps;
+            pts.push(new THREE.Vector3(-8.4 + t * 4.6, 0, 5.6 - Math.sin(t * Math.PI) * 1.5 - t * 2.2));
+          }
+          const spiralSteps = 160;
+          const startAngle = Math.atan2(3.4, -3.8);
+          for (let i = 0; i <= spiralSteps; i++) {
+            const t = i / spiralSteps;
+            const angle = startAngle - t * TURNS * Math.PI * 2;
+            const r = START_R * (1 - t) + RING_R * t;
+            pts.push(new THREE.Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r));
+          }
+          const spiral = placeDominoChain(pts, PITCH, (i) => (i % 10 === 0 ? 2 : i % 2), true);
+
+          // ... which rolls straight into a ring. Seven rays peel inward off the ring (the starburst).
+          const lp = spiral[spiral.length - 1].body.position;
+          const a0 = Math.atan2(lp.z, lp.x), R = Math.hypot(lp.x, lp.z);
+          const N = 30;     // ring stops short of a full turn so it never runs into the spiral's last loop
+          const poses = ringPoses(0, 0, R, a0, N + 1, true).slice(1);
+          const nodes = {};
+          for (let k = 3; k < N - 5; k += 4) {
+            nodes[k] = {
+              inward: true,
+              branch: (p, s) => radialBranch(p, s, 0, 0, true, 5, (j) => (j === 0 ? 2 : 1), 0.3, 3)
+            };
+          }
+          layPoses(poses, (i) => (i % 5 === 4 ? 2 : i % 2), nodes, { center: [0, 0] });
+        }
+      },
+      {
+        title: '02 · The Viaduct & Stepped Cascade',
+        camPos: new THREE.Vector3(9.8, 7.6, 11.4),
+        camTarget: new THREE.Vector3(0, 1.3, 0),
+        build() {
+          // Architectural Grand Staircase Ascending to an Elevated Bridge and Cascading Down
+          const stepCount = 4;
+          const stepH = 0.21;
+          const stepRun = 0.78;
+          const baseZ = -1.5;
+
+          // Ascending Steps
+          for (let s = 0; s < stepCount; s++) {
+            const h = (s + 1) * stepH;
+            const x = -4.3 + s * stepRun;
+            addPlinth(x, 0, baseZ, stepRun, h, 1.5);
+          }
+
+          // Elevated Central Viaduct Span
+          const topH = stepCount * stepH;
+          const bridgeW = 3.1;
+          addPlinth(0, 0, baseZ, bridgeW, topH, 1.5);
+
+          // Descending Steps
+          for (let s = 0; s < stepCount; s++) {
+            const h = (stepCount - s) * stepH;
+            const x = 1.94 + s * stepRun;
+            addPlinth(x, 0, baseZ, stepRun, h, 1.5);
+          }
+
+          // Ground approach lead-in (0.38m pitch right up to first step edge)
+          for (let i = 0; i < 8; i++) {
+            const x = -7.52 + i * 0.38;
+            addDomino(x, 0, baseZ, Math.PI * 0.5, i % 2, i === 0);
+          }
+
+          // Dominoes climbing each ascending step (2 per step at 0.39m pitch so top edge cleanly strikes next step)
+          for (let s = 0; s < stepCount; s++) {
+            const y = (s + 1) * stepH;
+            const xStart = -4.3 + s * stepRun - 0.19;
+            addDomino(xStart, y, baseZ, Math.PI * 0.5, 0);
+            addDomino(xStart + 0.39, y, baseZ, Math.PI * 0.5, 2);
+          }
+
+          // Dominoes crossing the Viaduct Bridge (0.38m pitch)
+          for (let i = 0; i < 8; i++) {
+            const x = -1.35 + i * 0.38;
+            addDomino(x, topH, baseZ, Math.PI * 0.5, i % 2);
+          }
+
+          // Dominoes cascading down the descending steps
+          for (let s = 0; s < stepCount; s++) {
+            const y = (stepCount - s) * stepH;
+            const xStart = 1.94 + s * stepRun - 0.19;
+            addDomino(xStart, y, baseZ, Math.PI * 0.5, 2);
+            addDomino(xStart + 0.39, y, baseZ, Math.PI * 0.5, 1);
+          }
+
+          // Two ground pieces bridge the last step to the return curve (it used to leave a ~1m dead gap)
+          addDomino(4.86, 0, baseZ, Math.PI * 0.5, 0);
+          addDomino(5.24, 0, baseZ, Math.PI * 0.5, 2);
+
+          // Sweeping ground return (right-hand arc, R~2.65) ...
+          const arc = steerChain(5.62, baseZ, Math.PI * 0.5, 26, -Math.PI * 1.15, (i) => i % 2);
+
+          // ... into a four-ray finale fan: Y-split, each arm curves outward, then splits again
+          const [aL, aR] = splitPose(arc.next, 0.27, 0.10);
+          const armL = steerChain(aL.x, aL.z, aL.h, 4, +0.55, (i) => (i + 1) % 3);
+          const armR = steerChain(aR.x, aR.z, aR.h, 4, -0.55, (i) => (i + 1) % 3);
+          for (const arm of [armL, armR]) {
+            const [bL, bR] = splitPose(arm.next, 0.27, 0.10);
+            steerChain(bL.x, bL.z, bL.h, 7, +0.10, (k) => (k + 1) % 3);
+            steerChain(bR.x, bR.z, bR.h, 7, -0.10, (k) => (k + 1) % 3);
+          }
+        }
+      },
+      {
+        title: '03 · The Kinetic Mandala',
+        camPos: new THREE.Vector3(0.5, 12.2, 9.8),
+        camTarget: new THREE.Vector3(0, 0.4, 0),
+        build() {
+          // Entry fuse runs tangentially into the outer ring (a radial entry only hits the first ring piece on its
+          // thin edge, which cannot tip it along the ring).
+          const OUTER_R = 3.6, INNER_R = 1.3;
+          const FUSE_N = 20;
+          // ring starts at the bottom (angle -90deg) travelling +x (counter-clockwise)
+          const a0 = -Math.PI * 0.5;
+          const ringStartX = 0, ringStartZ = -OUTER_R;
+          steerChain(ringStartX - FUSE_N * PITCH, ringStartZ, Math.PI * 0.5, FUSE_N,
+            0, (i) => (i % 3 === 0 ? 2 : 0), { starter: true });
+
+          const N = 54;                                    // ~324 degrees; the gap is where the fuse comes in
+          const poses = ringPoses(0, 0, OUTER_R, a0, N, false);
+          const nodes = {};
+          // 11 inward spokes (CCW ring: centre is on the LEFT = +1) and 5 outward petals between them
+          for (let k = 3; k < N - 1; k += 5) {
+            nodes[k] = {
+              inward: true,
+              branch: (p, s) => radialBranch(p, s, 0, 0, true, 4, (j) => (j === 0 ? 2 : (k % 2)), 0.3, 2)
+            };
+          }
+          for (let k = 10; k < N - 3; k += 10) {
+            nodes[k] = {
+              inward: false,
+              branch: (p, s) => {
+                // petal: out along the radius, then a 300-degree loop
+                const out = radialBranch(p, s, 0, 0, false, 3, (j) => (j % 2 ? 2 : 1), 0.3, 2);
+                steerChain(out.next.x, out.next.z, out.next.h, 12, +Math.PI * 1.4, (j) => (j % 2 ? 2 : 1), { turnPieces: 12 });
+              }
+            };
+          }
+          // one spoke becomes the feed arm of the inner sacred ring: it curls tangentially into it
+          const armSlot = 23;
+          nodes[armSlot] = {
+            inward: true,
+            branch: (p, s) => {
+              const h0 = radialHeading(p.x, p.z, 0, 0, true);
+              const straight = steerChain(p.x, p.z, h0, 3, 0, () => 2);
+              const curl = steerChain(straight.next.x, straight.next.z, straight.next.h, 4, +Math.PI * 0.5, () => 2, { turnPieces: 4 });
+              const e = curl.next;
+              const ia = Math.atan2(e.z, e.x), ir = Math.hypot(e.x, e.z);
+              const inner = ringPoses(0, 0, ir, ia, 17, false);
+              layPoses(inner, () => 2, {}, { center: [0, 0] });
+            }
+          };
+          layPoses(poses, (i) => i % 2, nodes, { center: [0, 0] });
+        }
+      },
+      {
+        title: '04 · The Cathedral Monument Wall',
+        camPos: new THREE.Vector3(8.5, 6.2, 10.2),
+        camTarget: new THREE.Vector3(0, 1.8, 0),
+        wakeRadius: 1.0,   // the wall stays out of the simulation (perfectly still) until the fuse is ~1 m away, then wakes as one
+        retire: false,
+        build() {
+          // Ground-level fuse: runs down -z, then Y-splits toward the two outer columns of the wall
+          const lead = steerChain(0, 7.0, Math.PI, 7, 0, (i) => (i === 0 ? 2 : 0), { starter: true });
+          const [L, R] = splitPose(lead.next, 0.27, 0.10);
+          const bl = [
+            new THREE.Vector3(L.x, 0, L.z),
+            new THREE.Vector3(-1.85, 0, 3.1),
+            new THREE.Vector3(-2.52, 0, 1.6),
+            new THREE.Vector3(-2.52, 0, 0.42)
+          ];
+          const br = [
+            new THREE.Vector3(R.x, 0, R.z),
+            new THREE.Vector3(1.85, 0, 3.1),
+            new THREE.Vector3(2.52, 0, 1.6),
+            new THREE.Vector3(2.52, 0, 0.42)
+          ];
+          placeDominoChain(bl, PITCH, (i) => i % 2, false);
+          placeDominoChain(br, PITCH, (i) => i % 2, false);
+
+          // Multi-tier wall: pillars (stood on end) carrying flat lintels, which carry the next tier
+          const tiers = 5, cols = 7, colSpacing = 0.84;
+          const levelHeight = DOMINO_H + DOMINO_D + 0.002;
+          for (let tier = 0; tier < tiers; tier++) {
+            const baseY = tier * levelHeight;
+            const currentCols = cols - Math.floor(tier * 0.5);
+            const startX = -((currentCols - 1) * colSpacing) * 0.5;
+            for (let c = 0; c < currentCols; c++) {
+              addDomino(startX + c * colSpacing, baseY, 0, 0, (tier + c) % 2, false, 1.0, true);
+            }
+            for (let c = 0; c < currentCols - 1; c++) {
+              addLintel(startX + (c + 0.5) * colSpacing, baseY + DOMINO_H + 0.001, 0);
+            }
+          }
+        }
+      }
+    ];
+
+    // =========================================================================
+    // 7b. PROCEDURAL PATTERN LIBRARY · LAYOUT VALIDATION · FREEHAND STROKES · STALL ASSIST
+    // Everything here is pure layout/physics logic (no DOM), so it can be verified headlessly.
+    // Safety limits live here: PIECE_CAP, FIELD_HALF, overlap rejection, curvature limits and the stall assist.
+    // =========================================================================
+    const IS_TOUCH = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    const PIECE_CAP = globalThis.__PIECE_CAP || (IS_TOUCH ? 300 : 420);   // hard ceiling on pieces (phones get less)
+    const FIELD_HALF = 12;      // a board's footprint must fit in a (2 x this) metre square, centred on the origin
+    const MIN_LAYOUT = 20;      // anything smaller is not worth toppling
+
+    // ---- seeded randomness -------------------------------------------------------------------------
+    function makeRng(seed) {
+      let a = (seed >>> 0) || 1;
+      return function () {
+        a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    const rRange = (rng, a, b) => a + rng() * (b - a);
+    const rInt = (rng, a, b) => a + Math.floor(rng() * (b - a + 1));
+    const rPick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
+
+    // ---- oriented-box overlap test (separating axis) -----------------------------------------------
+    function obbOfBody(body) {
+      const he = body.shapes[0].halfExtents, q = body.quaternion;
+      return {
+        c: body.position, he: [he.x, he.y, he.z],
+        ax: [new CANNON.Vec3(1, 0, 0), new CANNON.Vec3(0, 1, 0), new CANNON.Vec3(0, 0, 1)].map(v => q.vmult(v))
+      };
+    }
+    function obbOfPose(x, z, h) {
+      const q = new CANNON.Quaternion(); q.setFromEuler(0, h, 0);
+      return {
+        c: new CANNON.Vec3(x, DOMINO_H * 0.5, z), he: [COLLIDER_W * 0.5, COLLIDER_H * 0.5, COLLIDER_D * 0.5],
+        ax: [new CANNON.Vec3(1, 0, 0), new CANNON.Vec3(0, 1, 0), new CANNON.Vec3(0, 0, 1)].map(v => q.vmult(v))
+      };
+    }
+    const _dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+    function obbPenetration(A, B) {
+      const t = B.c.vsub(A.c);
+      const axes = [...A.ax, ...B.ax];
+      for (const a of A.ax) for (const b of B.ax) {
+        const c = new CANNON.Vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+        if (c.lengthSquared() > 1e-8) { c.normalize(); axes.push(c); }
+      }
+      let m = Infinity;
+      for (const L of axes) {
+        let ra = 0, rb = 0;
+        for (let i = 0; i < 3; i++) { ra += A.he[i] * Math.abs(_dot(A.ax[i], L)); rb += B.he[i] * Math.abs(_dot(B.ax[i], L)); }
+        const o = ra + rb - Math.abs(_dot(t, L));
+        if (o <= 0) return 0;
+        if (o < m) m = o;
+      }
+      return m;
+    }
+    // Number of overlapping pairs among the current pieces (4 mm tolerance)
+    function layoutOverlaps(tol = 0.004) {
+      const o = dominoes.map(d => obbOfBody(d.body));
+      let n = 0;
+      for (let i = 0; i < o.length; i++) for (let j = i + 1; j < o.length; j++) {
+        if (Math.abs(o[i].c.x - o[j].c.x) > 1.3 || Math.abs(o[i].c.z - o[j].c.z) > 1.3) continue;
+        if (obbPenetration(o[i], o[j]) > tol) n++;
+      }
+      return n;
+    }
+    function poseOverlaps(x, z, h, tol = 0.004) {
+      const p = obbOfPose(x, z, h);
+      for (const d of dominoes) {
+        const c = d.body.position;
+        if (Math.abs(c.x - x) > 1.3 || Math.abs(c.z - z) > 1.3) continue;
+        if (obbPenetration(p, obbOfBody(d.body)) > tol) return true;
+      }
+      return false;
+    }
+    function layoutBounds() {
+      const b = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+      for (const d of dominoes) {
+        const p = d.body.position;
+        b.minX = Math.min(b.minX, p.x); b.maxX = Math.max(b.maxX, p.x);
+        b.minZ = Math.min(b.minZ, p.z); b.maxZ = Math.max(b.maxZ, p.z);
+      }
+      return b;
+    }
+    // Shift the whole layout so its footprint is centred on the origin (cameras assume that)
+    function recenterLayout() {
+      if (!dominoes.length) return;
+      const b = layoutBounds();
+      const cx = (b.minX + b.maxX) / 2, cz = (b.minZ + b.maxZ) / 2;
+      for (const d of dominoes) {
+        d.body.position.x -= cx; d.body.position.z -= cz;
+        d.mesh.position.x -= cx; d.mesh.position.z -= cz;
+      }
+      if (starterDomino) starterRing.position.set(starterDomino.body.position.x, 0.008, starterDomino.body.position.z);
+    }
+    // Smallest radius of curvature along a polyline (metres); used to reject pieces of path too tight to topple
+    function minCurveRadius(pts) {
+      let best = Infinity;
+      for (let i = 1; i < pts.length - 1; i++) {
+        const a = pts[i - 1], b = pts[i], c = pts[i + 1];
+        const abx = b.x - a.x, abz = b.z - a.z, bcx = c.x - b.x, bcz = c.z - b.z;
+        const cr = Math.abs(abx * bcz - abz * bcx);
+        if (cr < 1e-9) continue;
+        const ab = Math.hypot(abx, abz), bc = Math.hypot(bcx, bcz), ac = Math.hypot(c.x - a.x, c.z - a.z);
+        best = Math.min(best, (ab * bc * ac) / (2 * cr));
+      }
+      return best;
+    }
+
+    // ---- colour styles -----------------------------------------------------------------------------
+    function colorStyle(rng) {
+      const s = rInt(rng, 0, 2);
+      if (s === 0) return (i) => i % 2;
+      if (s === 1) return (i) => (i % 7 === 6 ? 2 : i % 2);
+      return (i) => Math.floor(i / 6) % 3;
+    }
+
+    // ---- pattern generators ------------------------------------------------------------------------
+    // Each generator lays one connected, self-avoiding board around the origin. size: 0 = S, 1 = M, 2 = L.
+    let genTailRec = null;          // the through-end of the pattern just generated (where a following pattern attaches)
+    let genSpiralMode = null;       // inside a combination: first-part spirals unwind outward ('out'), last-part spirals wind inward ('in')
+    function genSnake(rng, size) {
+      const rows = [rInt(rng, 2, 3), rInt(rng, 4, 5), rInt(rng, 6, 7)][size];
+      const gap = rRange(rng, 1.7, 2.0);
+      const len = [rRange(rng, 7, 10), rRange(rng, 9, 12), rRange(rng, 10, 11.5)][size];
+      const A = rng() < 0.6 ? rRange(rng, 0.15, 0.35) : 0;
+      const nHalf = Math.max(2, Math.round(len / rRange(rng, 1.6, 3.0)));
+      const lam = 2 * len / nHalf;
+      const pts = [];
+      const step = 0.25;
+      for (let r = 0; r < rows; r++) {
+        const zr = (r - (rows - 1) / 2) * gap;
+        const dir = r % 2 === 0 ? 1 : -1;
+        for (let s = 0; s <= len + 1e-6; s += step) {
+          const x = (dir === 1 ? -len / 2 + s : len / 2 - s);
+          pts.push(new THREE.Vector3(x, 0, zr + A * Math.sin(2 * Math.PI * s / lam)));
+        }
+        if (r < rows - 1) {
+          const xe = dir === 1 ? len / 2 : -len / 2;
+          const rad = gap / 2;
+          for (let t = 0.3; t < Math.PI - 0.01; t += 0.3) {
+            pts.push(new THREE.Vector3(xe + dir * rad * Math.sin(t), 0, zr + rad - rad * Math.cos(t)));
+          }
+        }
+      }
+      const recs = placeDominoChain(pts, PITCH, colorStyle(rng), true);
+      genTailRec = recs[recs.length - 1];
+    }
+
+    function genSpiral(rng, size, bloom = false) {
+      const target = [rRange(rng, 45, 65), rRange(rng, 95, 125), rRange(rng, 170, 215)][size] * PITCH;
+      const gap = bloom ? rRange(rng, 1.55, 1.9) : rRange(rng, 1.2, 1.6);
+      const inner = rRange(rng, 1.5, 2.3) + (bloom ? 0.5 : 0);
+      const dir = rng() < 0.5 ? 1 : -1;
+      const roll = rng() < 0.5;
+      const outward = genSpiralMode === 'out' ? true : genSpiralMode === 'in' ? false : roll;
+      const eps = bloom ? rRange(rng, 0.04, 0.09) : 0;
+      const k = bloom ? rInt(rng, 3, 5) : 3;
+      const b = gap / (2 * Math.PI);
+      const rAt = (th) => (inner + b * th) * (1 + eps * Math.cos(k * th));
+      // integrate arc length until the target is reached
+      const pts = [];
+      let th = 0, L = 0, prev = null;
+      while (L < target && th < 80) {
+        const r = rAt(th);
+        const p = new THREE.Vector3(Math.cos(dir * th) * r, 0, Math.sin(dir * th) * r);
+        if (prev) L += Math.hypot(p.x - prev.x, p.z - prev.z);
+        pts.push(p); prev = p;
+        th += Math.min(0.2, 0.22 / Math.max(r, 0.5));
+      }
+      if (!outward) pts.reverse();
+      if (minCurveRadius(pts) < 1.25) throw new Error('spiral too tight');
+      const recs = placeDominoChain(pts, PITCH, colorStyle(rng), true);
+      genTailRec = recs[recs.length - 1];
+    }
+    const genBloom = (rng, size) => genSpiral(rng, size, true);
+
+    function genTree(rng, size) {
+      const budget = [rRange(rng, 55, 75), rRange(rng, 105, 140), rRange(rng, 190, 240)][size];
+      const decay = 0.8;
+      const seg = (L0, d) => Math.max(3, Math.round(L0 * Math.pow(decay, d)));
+      const total = (L0, D) => { let s = 0; for (let d = 0; d <= D; d++) s += Math.pow(2, d) * seg(L0, d); return s; };
+      const cands = [];
+      for (let D = 3; D <= 4; D++) for (let L0 = 4; L0 <= 12; L0++) {
+        const t = total(L0, D);
+        if (t <= budget && t >= budget * 0.6) cands.push({ D, L0, t });
+      }
+      if (!cands.length) throw new Error('no tree fits');
+      cands.sort((a, b) => b.t - a.t);
+      const { D, L0 } = rPick(rng, cands.slice(0, 3));
+      const th0 = rRange(rng, 0.5, 0.65), thDecay = 0.55;   // angles halve-ish each level so inner branches never converge
+      const grow = (pose, d, turn) => {
+        const colorFn = (i) => (i % 2 === 0 ? d % 3 : (d + 1) % 3);
+        const out = steerChain(pose.x, pose.z, pose.h, seg(L0, d), turn, colorFn, { turnPieces: Math.min(4, seg(L0, d)), starter: d === 0 });
+        if (d === D && !genTailRec) genTailRec = out.recs[out.recs.length - 1];
+        if (d < D) {
+          const [l, r] = splitPose(out.next, 0.27, 0.10);
+          const th = th0 * Math.pow(thDecay, d);
+          grow(l, d + 1, +th);
+          grow(r, d + 1, -th);
+        }
+      };
+      grow({ x: 0, z: 7.5, h: Math.PI }, 0, 0);
+    }
+
+    function genMandala(rng, size) {
+      const R = [rRange(rng, 2.5, 3.0), rRange(rng, 2.8, 3.4), rRange(rng, 3.2, 3.9)][size];
+      const step = rPick(rng, [4, 5]);
+      let rays = [rInt(rng, 4, 5), rInt(rng, 5, 7), rInt(rng, 7, 9)][size];
+      const inward = rng() < 0.65;
+      const circ = 2 * Math.PI * R / PITCH;
+      while (rays > 3 && 3 + step * (rays - 1) + 3 > circ * 0.9) rays--;
+      const N = 3 + step * (rays - 1) + 3;
+      let rayLen = rInt(rng, 4, 6);
+      if (inward) rayLen = Math.max(3, Math.min(rayLen, Math.floor((R - 1.1) / 0.36)));
+      const turns = (inward && size > 0) ? rPick(rng, [0, 1.0, 1.8]) : 0;
+      const colorFn = colorStyle(rng);
+      const nodes = {};
+      for (let k = 3; k < N - 2 && Object.keys(nodes).length < rays; k += step) {
+        nodes[k] = { inward, branch: (p, s) => radialBranch(p, s, 0, 0, inward, rayLen, (j) => (j === 0 ? 2 : 1), 0.3, 3) };
+      }
+      if (turns > 0) {
+        const startR = R + turns * 1.45;
+        const pts = [];
+        const a0 = rng() * Math.PI * 2;
+        const spiralSteps = 160;
+        for (let i = 0; i <= spiralSteps; i++) {
+          const t = i / spiralSteps;
+          const angle = a0 - t * turns * Math.PI * 2;
+          const r = startR * (1 - t) + R * t;
+          pts.push(new THREE.Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r));
+        }
+        if (minCurveRadius(pts) < 1.4) throw new Error('lead too tight');
+        const spiral = placeDominoChain(pts, PITCH, (i) => (i % 10 === 0 ? 2 : i % 2), true);
+        const lp = spiral[spiral.length - 1].body.position;
+        const a1 = Math.atan2(lp.z, lp.x), R1 = Math.hypot(lp.x, lp.z);
+        const poses = ringPoses(0, 0, R1, a1, N + 1, true).slice(1);
+        const recs = layPoses(poses, (i) => (i % 5 === 4 ? 2 : i % 2), nodes, { center: [0, 0] });
+        genTailRec = recs[recs.length - 1];
+      } else {
+        const cw = rng() < 0.5;
+        const poses = ringPoses(0, 0, R, rng() * Math.PI * 2, N, cw);
+        const recs = layPoses(poses, colorFn, nodes, { center: [0, 0], starter: true });
+        genTailRec = recs[recs.length - 1];
+      }
+    }
+
+    function genFishbone(rng, size) {
+      const m = [rInt(rng, 4, 6), rInt(rng, 6, 9), rInt(rng, 9, 12)][size];
+      const step = 3;
+      const bl = [rInt(rng, 3, 5), rInt(rng, 4, 6), rInt(rng, 4, 7)][size];
+      const N = 2 + step * m + 3;
+      const poses = [];
+      for (let i = 0; i < N; i++) poses.push({ x: 0, z: N * PITCH * 0.5 - i * PITCH, h: Math.PI });
+      const colorFn = colorStyle(rng);
+      const nodes = {};
+      for (let j = 0; j < m; j++) {
+        const side = j % 2 === 0 ? 1 : -1;
+        nodes[2 + j * step] = {
+          side,
+          branch: (p, s) => steerChain(p.x, p.z, p.h + s * 0.3, bl, s * (Math.PI / 2 - 0.3), (i) => (i % 2 ? 2 : 1), { turnPieces: 3 })
+        };
+      }
+      const recs = layPoses(poses, colorFn, nodes, { starter: true });
+      genTailRec = recs[recs.length - 1];
+    }
+
+    const PATTERNS = {
+      snake:    { name: 'Switchback', gen: genSnake },
+      spiral:   { name: 'Spiral', gen: (r, s) => genSpiral(r, s, false) },
+      bloom:    { name: 'Bloom', gen: genBloom },
+      tree:     { name: 'Fractal Tree', gen: genTree },
+      mandala:  { name: 'Mandala', gen: genMandala },
+      fishbone: { name: 'Fishbone', gen: genFishbone }
+    };
+    const SIZE_NAMES = ['Small', 'Medium', 'Large'];
+
+
+    // ---- combining patterns --------------------------------------------------------------------------
+    // Each pattern is generated on its own, captured as a list of piece poses, then attached to the previous
+    // one: the last piece of pattern A falls onto the first piece of pattern B (optionally through a short curved
+    // connector), so one wave runs through the whole board. Placement is a search over (connector length, turn,
+    // mirror) that rejects any candidate that overlaps or leaves the field, so it either works or tries again.
+    function capturePattern(id, seed, size, mode) {
+      clearWorld();
+      genTailRec = null; genSpiralMode = mode || null;
+      try { PATTERNS[id].gen(makeRng(seed), size); } catch (e) { clearWorld(); genSpiralMode = null; return null; }
+      genSpiralMode = null;
+      if (!dominoes.length || !genTailRec || dominoes[0] !== starterDomino) { clearWorld(); return null; }
+      const poseOf = (d) => ({ x: d.body.position.x, z: d.body.position.z, h: Math.atan2(d.forwardDir.x, d.forwardDir.z), c: d.colorSlot });
+      const out = { pieces: dominoes.map(poseOf), tail: poseOf(genTailRec) };
+      clearWorld();
+      return out;
+    }
+    const rotP = (x, z, phi) => ({ x: x * Math.cos(phi) + z * Math.sin(phi), z: -x * Math.sin(phi) + z * Math.cos(phi) });
+    // express a part in its own frame: first piece at the origin facing +z
+    function normalizePart(part) {
+      const s0 = part.pieces[0];
+      const f = (p) => { const r = rotP(p.x - s0.x, p.z - s0.z, -s0.h); return { x: r.x, z: r.z, h: p.h - s0.h, c: p.c }; };
+      return { pieces: part.pieces.map(f), tail: f(part.tail) };
+    }
+    function placePart(np, mirror, next) {
+      const f = (p) => {
+        const x = mirror ? -p.x : p.x, h = mirror ? -p.h : p.h;
+        const r = rotP(x, p.z, next.h);
+        return { x: r.x + next.x, z: r.z + next.z, h: h + next.h, c: p.c };
+      };
+      return { pieces: np.pieces.map(f), tail: f(np.tail) };
+    }
+    function connectorPoses(tail, k, turn) {
+      let x = tail.x + Math.sin(tail.h) * PITCH, z = tail.z + Math.cos(tail.h) * PITCH;
+      const poses = [], tp = Math.max(2, k);
+      for (let i = 0; i < k; i++) {
+        const kk = Math.min(1, i / (tp - 1)), kMid = Math.min(1, (i + 0.5) / (tp - 1));
+        poses.push({ x, z, h: tail.h + turn * kk, c: i % 2 });
+        x += Math.sin(tail.h + turn * kMid) * PITCH; z += Math.cos(tail.h + turn * kMid) * PITCH;
+      }
+      return { poses, next: { x, z, h: tail.h + turn } };
+    }
+    function makePoseIndex() {
+      const cells = new Map();
+      const key = (x, z) => Math.floor(x) + ',' + Math.floor(z);
+      return {
+        add(p) { const k = key(p.x, p.z); (cells.get(k) || cells.set(k, []).get(k)).push(p); },
+        // is any (non-exempt) piece closer than minD? A falling piece sweeps ~0.9 m, so separate strands need that much room.
+        tooClose(p, minD, exempt) {
+          const cx = Math.floor(p.x), cz = Math.floor(p.z);
+          for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+            const arr = cells.get((cx + i) + ',' + (cz + j));
+            if (!arr) continue;
+            for (const q of arr) if (Math.hypot(q.x - p.x, q.z - p.z) < minD && !(exempt && exempt(q))) return true;
+          }
+          return false;
+        },
+        hits(p) {
+          const cx = Math.floor(p.x), cz = Math.floor(p.z);
+          for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+            const arr = cells.get((cx + i) + ',' + (cz + j));
+            if (!arr) continue;
+            for (const q of arr) {
+              if (Math.abs(q.x - p.x) > 0.9 || Math.abs(q.z - p.z) > 0.9) continue;
+              if (!p._o) p._o = obbOfPose(p.x, p.z, p.h);
+              if (!q._o) q._o = obbOfPose(q.x, q.z, q.h);
+              if (obbPenetration(p._o, q._o) > 0.004) return true;
+            }
+          }
+          return false;
+        }
+      };
+    }
+    // Returns { pieces: [{x,z,h,c}] } (first piece is the starter) or null if no arrangement was found.
+    // A spiral can only be entered from its outside, so spirals/blooms can only be the first part (unwinding
+    // outward from their centre) or the last (winding inward). Reorder so that always holds.
+    function orderForCombo(ids) {
+      const sp = ids.filter(i => i === 'spiral' || i === 'bloom'), rest = ids.filter(i => !sp.includes(i));
+      if (ids.length < 2 || !sp.length) return ids.slice();
+      if (sp.length === 1) return ids.indexOf(sp[0]) === 0 ? [sp[0], ...rest] : [...rest, sp[0]];
+      return [sp[0], ...rest, sp[1]];
+    }
+    function composePieces(idsIn, seed, size) {
+      const ids = orderForCombo(idsIn);
+      const rng = makeRng((seed ^ 0x9e3779b9) >>> 0);
+      const budget = PIECE_CAP - 4;
+      const sizes = ids.map(() => size);
+      const genPart = (i) => capturePattern(ids[i], (seed + 1013 * (i + 1)) >>> 0, sizes[i], ids.length < 2 ? null : (i === 0 ? 'out' : (i === ids.length - 1 ? 'in' : null)));
+      const parts = [];
+      for (let i = 0; i < ids.length; i++) { parts[i] = genPart(i); if (!parts[i]) return null; }
+      const total = () => parts.reduce((a, p) => a + p.pieces.length, 0);
+      for (let guard = 0; total() > budget && guard < 8; guard++) {
+        let j = -1, best = -1;
+        parts.forEach((p, i) => { if (sizes[i] > 0 && p.pieces.length > best) { best = p.pieces.length; j = i; } });
+        if (j < 0) break;
+        sizes[j]--; parts[j] = genPart(j); if (!parts[j]) return null;
+      }
+      if (total() > budget) return null;
+
+      const first = normalizePart(parts[0]);
+      const placed = first.pieces.slice();
+      let tail = first.tail;
+      const idx = makePoseIndex();
+      placed.forEach(p => idx.add(p));
+      const bb = { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity };
+      const grow = (list) => { for (const p of list) { bb.x0 = Math.min(bb.x0, p.x); bb.x1 = Math.max(bb.x1, p.x); bb.z0 = Math.min(bb.z0, p.z); bb.z1 = Math.max(bb.z1, p.z); } };
+      grow(placed);
+      const lim = 2 * FIELD_HALF - 1.2, CLEAR = 1.0;
+      for (let i = 1; i < parts.length; i++) {
+        const np = normalizePart(parts[i]);
+        let found = null;
+        for (let t = 0; t < 260 && !found; t++) {
+          let k = t === 0 ? 0 : rInt(rng, 0, 9);
+          let turn = k === 0 ? 0 : rRange(rng, -1.4, 1.4);
+          if (k > 0) k = Math.max(k, Math.ceil(Math.abs(turn) / 0.3));
+          const mirror = rng() < 0.5;
+          const con = connectorPoses(tail, k, turn);
+          const pp = placePart(np, mirror, con.next);
+          const all = con.poses.concat(pp.pieces);
+          // footprint check (the finished layout is re-centred, so only its size matters)
+          let x0 = bb.x0, x1 = bb.x1, z0 = bb.z0, z1 = bb.z1;
+          for (const p of all) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z); }
+          if (x1 - x0 > lim || z1 - z0 > lim) continue;
+          // no overlap with what is already placed, nor within the new run itself
+          let bad = false;
+          for (const p of all) { if (idx.hits(p)) { bad = true; break; } }
+          if (bad) continue;
+          const own = makePoseIndex();
+          for (const p of all) { if (own.hits(p)) { bad = true; break; } own.add(p); }
+          if (bad) continue;
+          // strands of different parts must stay a falling-piece's reach apart, except right at the junction
+          const near = (q) => Math.hypot(q.x - tail.x, q.z - tail.z) < 1.5;
+          for (let pi = 0; pi < all.length && !bad; pi++) if (idx.tooClose(all[pi], CLEAR, pi < 5 ? near : null)) bad = true;
+          for (let ci = 0; ci < con.poses.length && !bad; ci++) for (let bi = 0; bi < pp.pieces.length; bi++) {
+            if (bi < 5 && ci > con.poses.length - 5) continue;
+            if (Math.hypot(con.poses[ci].x - pp.pieces[bi].x, con.poses[ci].z - pp.pieces[bi].z) < CLEAR) { bad = true; break; }
+          }
+          if (bad) continue;
+          found = { all, tail: pp.tail, bb: { x0, x1, z0, z1 } };
+        }
+        if (!found) return null;
+        found.all.forEach(p => { idx.add(p); placed.push(p); });
+        tail = found.tail;
+        bb.x0 = found.bb.x0; bb.x1 = found.bb.x1; bb.z0 = found.bb.z0; bb.z1 = found.bb.z1;
+      }
+      if (placed.length > budget + 4) return null;
+      return { ids, pieces: placed.map(p => ({ x: p.x, z: p.z, h: p.h, c: p.c })) };
+    }
+    function makeCompositeDef(ids, seed, size, pieces) {
+      return {
+        title: ids.map(i => PATTERNS[i].name).join(' + '),
+        patternIds: ids.slice(), composite: true, seed, size, autoCam: true, recenter: true,
+        camPos: new THREE.Vector3(8, 9, 10), camTarget: new THREE.Vector3(0, 0.6, 0),
+        build() { for (const p of pieces) addDomino(p.x, 0, p.z, p.h, p.c, dominoes.length === 0); }
+      };
+    }
+    function resolveComposite(ids, seed, size) {
+      for (let attempt = 0; attempt < 24; attempt++) {
+        const s = (seed + attempt * 7919) >>> 0;
+        const sz = attempt < 12 ? size : Math.max(0, size - 1);   // if big shapes won't fit together, try one size down
+        let res = null;
+        try { res = composePieces(ids, s, sz); } catch (e) { res = null; }
+        if (!res) continue;
+        const def = makeCompositeDef(res.ids, s, sz, res.pieces);
+        loadDef(def);
+        if (validateLayout().ok) return def;
+      }
+      return null;
+    }
+
+    // The Grand Finale: a big pre-built board (a spiral that unwinds into a mandala that bursts into a tree).
+    // It is composed from fixed seeds the first time it is loaded, and sized to the device's piece cap.
+    let finalePieces = null;
+    BUILDS.push({
+      title: '05 · The Grand Finale',
+      autoCam: true, recenter: true,
+      camPos: new THREE.Vector3(10, 11, 12), camTarget: new THREE.Vector3(0, 0.6, 0),
+      build() {
+        if (!finalePieces) {
+          for (let k = 0; k < 40 && !finalePieces; k++) {
+            const r = composePieces(['spiral', 'mandala', 'tree'], 2024 + k * 7919, 2);
+            if (r) finalePieces = r.pieces;
+          }
+        }
+        if (finalePieces) for (const p of finalePieces) addDomino(p.x, 0, p.z, p.h, p.c, dominoes.length === 0);
+      }
+    });
+
+    function camForLayout() {
+      const b = layoutBounds();
+      const w = b.maxX - b.minX, d = b.maxZ - b.minZ;
+      const ext = Math.max(5, w, d);
+      return {
+        target: new THREE.Vector3((b.minX + b.maxX) / 2, 0.6, (b.minZ + b.maxZ) / 2),
+        pos: new THREE.Vector3((b.minX + b.maxX) / 2 + ext * 0.42, ext * 0.78 + 2.6, (b.minZ + b.maxZ) / 2 + ext * 0.86 + 1.5)
+      };
+    }
+
+    // Load a board definition into the physics world (shared by the app and the headless tests).
+    function loadDef(def) {
+      clearWorld();
+      def.build();
+      if (def.recenter) recenterLayout();
+      wakeRadius = def.wakeRadius ?? 1.8;
+      retireEnabled = def.retire !== false;
+      computeNeighbors(wakeRadius);
+      dominoes.forEach((d, i) => { d.order = i; });
+      if (def.autoCam) {
+        const c = camForLayout();
+        def.camPos = c.pos; def.camTarget = c.target;
+      }
+    }
+
+    function validateLayout() {
+      const n = dominoes.length;
+      if (n < MIN_LAYOUT) return { ok: false, reason: 'too few pieces (' + n + ')' };
+      if (n > PIECE_CAP) return { ok: false, reason: 'over piece cap (' + n + ')' };
+      const b = layoutBounds();
+      if (b.maxX - b.minX > 2 * FIELD_HALF - 0.6 || b.maxZ - b.minZ > 2 * FIELD_HALF - 0.6) return { ok: false, reason: 'off the board' };
+      const ov = layoutOverlaps();
+      if (ov) return { ok: false, reason: ov + ' overlapping pairs' };
+      return { ok: true };
+    }
+
+    function makePatternDef(id, seed, size) {
+      const P = PATTERNS[id];
+      return {
+        title: P.name + ' · ' + SIZE_NAMES[size],
+        patternId: id, seed, size, autoCam: true, recenter: true,
+        camPos: new THREE.Vector3(8, 9, 10), camTarget: new THREE.Vector3(0, 0.6, 0),
+        build() { P.gen(makeRng(seed), size); }
+      };
+    }
+    // Find a valid layout for (id, seed, size): if the first seed produces something invalid, step to the next
+    // seed (deterministically). The returned def is already loaded.
+    function resolvePattern(id, seed, size) {
+      for (let attempt = 0; attempt < 30; attempt++) {
+        const s = (seed + attempt * 7919) >>> 0;
+        const def = makePatternDef(id, s, size);
+        try {
+          loadDef(def);
+          if (validateLayout().ok) return def;
+        } catch (e) { /* try the next seed */ }
+      }
+      return null;
+    }
+
+    // ---- freehand strokes (builder) -----------------------------------------------------------------
+    // A stroke is a list of pointer samples (cm-quantised so a board can be saved and replayed exactly). Pieces
+    // are laid by pursuit steering: heading turns at most STROKE_MAX_TURN per piece, so no stroke can be drawn
+    // tighter than ~0.9 m radius, and any piece that would overlap something stops the stroke.
+    const STROKE_MAX_TURN = 0.42, STROKE_LOOK = 0.62, FORK_OFF = 0.27, FORK_KICK = 0.3;
+    const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+
+    function newStroke(x0, z0) {
+      return { samples: [{ x: x0, z: z0 }], recs: [], started: false, done: false, fork: -1, forkSide: 0, shift: null, extend: -1, si: 0, x: 0, z: 0, h: 0, blocked: false };
+    }
+    // Decide how a stroke that starts at (x,z) attaches to existing pieces: 'fork' beside a chain, 'extend' an end, or free.
+    function strokeAttach(st) {
+      const s0 = st.samples[0];
+      let best = null, bd = 0.62;
+      dominoes.forEach((d, i) => {
+        if (d.isLintel) return;
+        const dd = Math.hypot(d.body.position.x - s0.x, d.body.position.z - s0.z);
+        if (dd < bd) { bd = dd; best = i; }
+      });
+      if (best === null) return;
+      const P = dominoes[best];
+      const f = P.forwardDir, lx = f.z, lz = -f.x;   // left of heading (cos h, -sin h)
+      const rx = s0.x - P.body.position.x, rz = s0.z - P.body.position.z;
+      const along = rx * f.x + rz * f.z, lat = rx * lx + rz * lz;
+      const hasAhead = dominoes.some((d, i) => i !== best && !d.isLintel &&
+        Math.hypot(d.body.position.x - (P.body.position.x + f.x * PITCH), d.body.position.z - (P.body.position.z + f.z * PITCH)) < 0.25);
+      if (!hasAhead && Math.abs(lat) < 0.14 && along > 0) { st.extend = best; return; }
+      if (!P.forked && !P.isStarter && Math.abs(lat) >= 0.1) { st.fork = best; st.forkSide = lat >= 0 ? 1 : -1; }
+    }
+
+    function strokeAdvance(st, final = false) {
+      if (st.done) return;
+      const S = st.samples;
+      const place = (x, z, h) => {
+        if (dominoes.length >= PIECE_CAP || Math.abs(x) > FIELD_HALF || Math.abs(z) > FIELD_HALF || poseOverlaps(x, z, h)) {
+          st.done = true; st.blocked = true; return null;
+        }
+        const rec = addDomino(x, 0, z, h, st.recs.length % 2, dominoes.length === 0);
+        st.recs.push(rec);
+        return rec;
+      };
+      if (!st.started) {
+        let k = 1;
+        while (k < S.length && Math.hypot(S[k].x - S[0].x, S[k].z - S[0].z) < 0.3) k++;
+        if (k >= S.length) { if (final) st.done = true; return; }
+        if (st.fork >= 0) {
+          const P = dominoes[st.fork], f = P.forwardDir, lx = f.z, lz = -f.x, s = st.forkSide;
+          st.shift = { rec: P, dx: -s * lx * FORK_OFF, dz: -s * lz * FORK_OFF };
+          // peel: the parent piece slides aside; the branch starts on the opposite side. Check both before committing.
+          const ph = Math.atan2(f.x, f.z);
+          const bx = P.body.position.x + s * lx * FORK_OFF, bz = P.body.position.z + s * lz * FORK_OFF;
+          P.body.position.x += st.shift.dx; P.body.position.z += st.shift.dz;
+          P.mesh.position.x += st.shift.dx; P.mesh.position.z += st.shift.dz;
+          P.forked = true;
+          st.x = bx; st.z = bz; st.h = ph + s * FORK_KICK;
+          if (!place(st.x, st.z, st.h)) { strokeUnshift(st); return; }
+        } else if (st.extend >= 0) {
+          const P = dominoes[st.extend], f = P.forwardDir;
+          st.x = P.body.position.x + f.x * PITCH; st.z = P.body.position.z + f.z * PITCH; st.h = Math.atan2(f.x, f.z);
+          if (!place(st.x, st.z, st.h)) return;
+        } else {
+          st.x = S[0].x; st.z = S[0].z; st.h = Math.atan2(S[k].x - S[0].x, S[k].z - S[0].z);
+          if (!place(st.x, st.z, st.h)) return;
+        }
+        st.started = true;
+      }
+      for (let guard = 0; guard < 600; guard++) {
+        while (st.si < S.length - 1 && Math.hypot(S[st.si].x - st.x, S[st.si].z - st.z) < 0.3) st.si++;
+        let j = st.si;
+        while (j < S.length && Math.hypot(S[j].x - st.x, S[j].z - st.z) < STROKE_LOOK) j++;
+        if (j >= S.length) {
+          if (!final) break;
+          j = S.length - 1;
+          if (Math.hypot(S[j].x - st.x, S[j].z - st.z) < 0.45) break;
+        }
+        const want = Math.atan2(S[j].x - st.x, S[j].z - st.z);
+        st.h += Math.max(-STROKE_MAX_TURN, Math.min(STROKE_MAX_TURN, wrapA(want - st.h)));
+        st.x += Math.sin(st.h) * PITCH; st.z += Math.cos(st.h) * PITCH;
+        if (!place(st.x, st.z, st.h)) break;
+      }
+      if (final) st.done = true;
+    }
+    function strokeUnshift(st) {
+      if (!st.shift) return;
+      const P = st.shift.rec;
+      P.body.position.x -= st.shift.dx; P.body.position.z -= st.shift.dz;
+      P.mesh.position.x -= st.shift.dx; P.mesh.position.z -= st.shift.dz;
+      P.forked = false; st.shift = null;
+    }
+    function removeStroke(st) {
+      for (const rec of st.recs) {
+        scene.remove(rec.mesh);
+        if (rec.inWorld) world.removeBody(rec.body);
+        const i = dominoes.indexOf(rec);
+        if (i >= 0) dominoes.splice(i, 1);
+      }
+      st.recs = [];
+      strokeUnshift(st);
+      starterDomino = dominoes.find(d => !d.isLintel) || null;
+      if (starterDomino) { starterDomino.isStarter = true; starterRing.position.set(starterDomino.body.position.x, 0.008, starterDomino.body.position.z); starterRing.visible = true; }
+      else starterRing.visible = false;
+    }
+    function finishBuilderBoard() {
+      computeNeighbors(1.8);
+      wakeRadius = 1.8; retireEnabled = true;
+      dominoes.forEach((d, i) => { d.order = i; });
+    }
+    // ---- board serialisation (share links / saved boards) ----
+    function encodeStrokes(strokes) {
+      const out = strokes.map(st => {
+        const a = [];
+        let px = 0, pz = 0;
+        for (const s of st.samples) { const x = Math.round(s.x * 100), z = Math.round(s.z * 100); a.push(x - px, z - pz); px = x; pz = z; }
+        return { f: st.fork, e: st.extend, s: a.join(',') };
+      });
+      const json = JSON.stringify(out);
+      return btoa(unescape(encodeURIComponent(json))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+    function decodeStrokes(str) {
+      const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+      const json = decodeURIComponent(escape(atob(b64 + '='.repeat((4 - b64.length % 4) % 4))));
+      const arr = JSON.parse(json);
+      if (!Array.isArray(arr) || arr.length > 80) throw new Error('bad board');
+      return arr.map(o => {
+        const nums = String(o.s).split(',').map(Number);
+        if (nums.length > 8000 || nums.some(n => !Number.isFinite(n))) throw new Error('bad board');
+        const samples = [];
+        let x = 0, z = 0;
+        for (let i = 0; i + 1 < nums.length; i += 2) { x += nums[i]; z += nums[i + 1]; samples.push({ x: x / 100, z: z / 100 }); }
+        return { samples, fork: o.f | 0, extend: o.e | 0 };
+      });
+    }
+    // Replay saved strokes into the world. Returns the live stroke records (for undo).
+    function replayStrokes(saved) {
+      const live = [];
+      for (const sv of saved) {
+        const st = newStroke(sv.samples[0].x, sv.samples[0].z);
+        st.samples = sv.samples.slice();
+        st.fork = sv.fork; st.extend = sv.extend;
+        if (st.fork >= 0) { const P = dominoes[st.fork]; st.forkSide = 0;
+          if (P) { const f = P.forwardDir; const rx = st.samples[0].x - P.body.position.x, rz = st.samples[0].z - P.body.position.z; st.forkSide = (rx * f.z + rz * -f.x) >= 0 ? 1 : -1; } else st.fork = -1; }
+        if (st.extend >= 0 && !dominoes[st.extend]) st.extend = -1;
+        strokeAdvance(st, false); strokeAdvance(st, true);
+        live.push(st);
+      }
+      return live;
+    }
+
+    // ---- stall assist ---------------------------------------------------------------------------------
+    // If a wave dies short of the end (a junction that didn't catch), nudge the nearest standing piece in front of
+    // the dead front so the run continues. Limited by the caller (a few nudges per run).
+    function assistStall(refX, refZ, radius = 1.25) {
+      let best = null, bd = radius;
+      for (const d of dominoes) {
+        if (d.isLintel || d.fallen || d.activated) continue;
+        if (d.upY !== undefined && d.upY < 0.98) continue;
+        const dd = Math.hypot(d.body.position.x - refX, d.body.position.z - refZ);
+        if (dd < bd) { bd = dd; best = d; }
+      }
+      if (!best) return null;
+      best.tip(best.forwardDir.x, best.forwardDir.z, TIP_OMEGA);
+      return best;
+    }
+
+    // =========================================================================
+    // 8. CAMERA DIRECTOR, RAYCAST INTERACTION & TELEMETRY
+    // =========================================================================
+    let cameraMode = 'wave'; // 'wave' | 'macro' | 'overhead' | 'orbit'
+    let timeScale = 1.0;
+    let isUserDragging = false;
+    const smoothCamPos = new THREE.Vector3();
+    const smoothCamTarget = new THREE.Vector3();
+    const lastActiveWavePos = new THREE.Vector3();
+    const lastActiveWaveDir = new THREE.Vector3(1, 0, 0);
+
+    controls.addEventListener('start', () => {
+      isUserDragging = true;
+    });
+    controls.addEventListener('end', () => {
+      isUserDragging = false;
+    });
+
+    const $ = (id) => document.getElementById(id);
+    let currentDef = BUILDS[0];
+    let currentSize = 1;
+    let appear = null, appearDoneAt = 0;
+    let lastActMs = 0, assistCount = 0, assistCheckAt = 0;
+    const lastFront = new THREE.Vector3();
+    let layoutExtent = { w: 12, d: 12 };
+
+    let toastTimer = 0;
+    function showToast(msg, ms = 2400) {
+      const t = $('toast');
+      t.textContent = msg;
+      t.style.opacity = '1';
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { t.style.opacity = '0'; }, ms);
+    }
+    const randomSeed = () => ((Math.random() * 2147483647) >>> 0) || 1;
+
+    // ---- appear animation: new boards lay themselves down along the chain; a rebuild stands the fallen pieces back up
+    function captureForRise() {
+      if (!dominoes.some(d => d.activated)) return null;
+      return dominoes.map(d => ({ p: d.mesh.position.clone(), q: d.mesh.quaternion.clone() }));
+    }
+    function startAppear(prev) {
+      const n = dominoes.length;
+      if (!n) { appear = null; return; }
+      const rise = !!prev && prev.length === n;
+      appear = { t: 0, rise, prev, dur: Math.min(2.4, 0.9 + n * 0.006) };
+      updateAppear(0);
+    }
+    const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+    const _q = new THREE.Quaternion();
+    function updateAppear(dt) {
+      if (!appear) return;
+      appear.t += dt;
+      const n = dominoes.length, span = appear.dur - 0.6;
+      const done = appear.t >= appear.dur;
+      for (let i = 0; i < n; i++) {
+        const d = dominoes[i];
+        const frac = appear.rise ? (n - 1 - i) / n : i / n;
+        const k = done ? 1 : Math.min(1, Math.max(0, (appear.t - frac * span) / 0.6));
+        if (appear.rise) {
+          const pv = appear.prev[i], e = easeOut(k);
+          d.mesh.position.lerpVectors(pv.p, d.body.position, e);
+          d.mesh.position.y += Math.sin(Math.PI * k) * 0.22;
+          d.mesh.quaternion.copy(pv.q).slerp(_q.set(d.body.quaternion.x, d.body.quaternion.y, d.body.quaternion.z, d.body.quaternion.w), e);
+        } else {
+          d.mesh.scale.copy(d.baseScale).multiplyScalar(Math.max(0.001, easeOut(k)));
+        }
+      }
+      if (done) {
+        for (const d of dominoes) {
+          d.mesh.position.copy(d.body.position);
+          d.mesh.quaternion.copy(d.body.quaternion);
+          d.mesh.scale.copy(d.baseScale);
+        }
+        appear = null;
+        appearDoneAt = performance.now();
+      }
+    }
+
+    function afterLoad(def, prev) {
+      currentDef = def;
+      currentBuildIndex = BUILDS.indexOf(def);
+      $('build-subtitle').textContent = def.title;
+      $('stat-total').textContent = dominoes.length;
+      updateStatsUI();
+      if (dominoes.length) {
+        const b = layoutBounds();
+        layoutExtent = { w: b.maxX - b.minX, d: b.maxZ - b.minZ };
+      }
+      smoothCamPos.copy(def.camPos);
+      smoothCamTarget.copy(def.camTarget);
+      if (starterDomino) {
+        lastActiveWavePos.set(starterDomino.body.position.x, starterDomino.body.position.y, starterDomino.body.position.z);
+        lastActiveWaveDir.copy(starterDomino.forwardDir);
+      } else {
+        lastActiveWavePos.copy(def.camTarget);
+      }
+      if (cameraMode === 'orbit') {
+        camera.position.copy(def.camPos);
+        controls.target.copy(def.camTarget);
+      }
+      assistCount = 0; lastActMs = performance.now();
+      startAppear(prev);
+      syncLibraryUI();
+    }
+    function loadBoard(def) {
+      if (builderMode) exitBuild(true);
+      const prev = captureForRise();
+      loadDef(def);
+      afterLoad(def, prev);
+      const idx = BUILDS.indexOf(def);
+      if (idx >= 0) history.replaceState(null, '', '#c=' + idx);
+    }
+    function selectPattern(id, seed, size) {
+      if (builderMode) exitBuild(true);
+      const prev = captureForRise();
+      const def = resolvePattern(id, seed, size);
+      if (!def) { showToast('Could not lay that one out, loading a featured board'); loadBoard(BUILDS[0]); return; }
+      currentSize = size;
+      afterLoad(def, prev);
+      history.replaceState(null, '', '#p=' + id + '.' + def.seed + '.' + size);
+    }
+    function selectComposite(ids, seed, size) {
+      if (builderMode) exitBuild(true);
+      const prev = captureForRise();
+      const def = resolveComposite(ids, seed, size);
+      if (!def) { showToast('Those do not fit together, try another mix'); return false; }
+      currentSize = size;
+      afterLoad(def, prev);
+      history.replaceState(null, '', patternHash(def));
+      return true;
+    }
+    function patternHash(def) {
+      if (def.patternIds) return '#m=' + def.patternIds.join('+') + '.' + def.seed + '.' + def.size;
+      if (def.patternId) return '#p=' + def.patternId + '.' + def.seed + '.' + def.size;
+      return '';
+    }
+    function loadBuild(index) { loadBoard(BUILDS[index]); }
+
+    function applyCalibratedToppleImpulse(target, customDirection = null) {
+      if (!target) return;
+      isToppling = true;
+      assistCount = 0; lastActMs = performance.now();
+
+      const tx = target.body.position.x;
+      const ty = target.body.position.y;
+      const tz = target.body.position.z;
+
+      // Determine forward tangent unit vector in XZ plane
+      const dir = new THREE.Vector3();
+      if (customDirection && customDirection.lengthSq() > 1e-6) {
+        dir.copy(customDirection).setY(0).normalize();
+      } else if (target.forwardDir && target.forwardDir.lengthSq() > 1e-6) {
+        dir.copy(target.forwardDir).setY(0).normalize();
+      } else {
+        const localFwd = new CANNON.Vec3(0, 0, 1);
+        target.body.quaternion.vmult(localFwd, localFwd);
+        dir.set(localFwd.x, 0, localFwd.z).normalize();
+      }
+
+      // Lock Wave Tracker initial focus onto the triggered domino so camera never snaps away or fights
+      lastActiveWavePos.set(tx, ty, tz);
+      lastActiveWaveDir.copy(dir);
+
+      // Tip the piece over its front-bottom edge toward `dir`; everything after that is physics.
+      if (target.tip) {
+        target.tip(dir.x, dir.z, TIP_OMEGA);
+      }
+
+      foley.playImpact(2.2, target.body.position.x, false);
+    }
+
+    function triggerStarterDomino() {
+      if (appear) return;
+      if (builderMode) exitBuild();
+      foley.init();
+      // If starter hasn't been tipped yet, tip it; otherwise find the next standing domino at the frontier so the button always works
+      let target = starterDomino && !starterDomino.activated
+        ? starterDomino
+        : dominoes.find(d => !d.activated && !d.fallen && !d.isLintel);
+      if (!target) return;
+
+      if (target === starterDomino) starterRing.visible = false;
+      hoverRing.visible = false;
+      applyCalibratedToppleImpulse(target);
+
+      // Hide hint toast once user interacts
+      const toast = document.getElementById('hint-toast');
+      if (toast) toast.style.opacity = '0';
+    }
+
+    function updateStatsUI() {
+      document.getElementById('stat-fallen').textContent = fallenCount;
+      const total = Math.max(1, dominoes.length);
+      const pct = Math.min(1, fallenCount / total);
+      const circumference = 87.96;
+      document.getElementById('progress-ring').style.strokeDashoffset = circumference * (1 - pct);
+    }
+
+    // Track Active Falling Wavefront for Cinematography (filtered strictly to newly tipping wave edge to eliminate camera bounce)
+    const waveCentroid = new THREE.Vector3();
+    const waveDirection = new THREE.Vector3();
+    const upVec = new CANNON.Vec3(0, 1, 0);
+    const tmpVec = new CANNON.Vec3();
+
+    function updateDominoStatesAndWave() {
+      let currentFallen = 0;
+      let activeCount = 0;
+      const nowMs = performance.now();
+      waveCentroid.set(0, 0, 0);
+      waveDirection.set(0, 0, 0);
+
+      for (let i = 0; i < dominoes.length; i++) {
+        const d = dominoes[i];
+        if (d.inWorld) {
+          d.mesh.position.copy(d.body.position);
+          d.mesh.quaternion.copy(d.body.quaternion);
+        }
+        const tiltCos = d.upY; // 1.0 = standing upright, 0.0 = flat on floor (computed in updateActiveSet)
+
+        if (!d.activated && (tiltCos < 0.995 || d.body.velocity.lengthSquared() > 0.05)) {
+          d.activated = true;
+          d.activatedAt = nowMs;
+          if (!d.isLintel) { lastActMs = nowMs; lastFront.copy(d.body.position); }
+        }
+
+        if (!d.isLintel && tiltCos < 0.58) {
+          if (!d.fallen) d.fallen = true;
+        }
+        if (d.fallen) currentFallen++;
+
+        // Only track the fresh leading wave edge (activated within last 650ms & mid-tip) so old jitter never bounces the camera
+        const ageMs = nowMs - d.activatedAt;
+        if (d.activated && !d.isLintel && ageMs < 650 && tiltCos < 0.97 && tiltCos > 0.35) {
+          waveCentroid.x += d.body.position.x;
+          waveCentroid.y += d.body.position.y;
+          waveCentroid.z += d.body.position.z;
+
+          waveDirection.x += d.body.velocity.x;
+          waveDirection.z += d.body.velocity.z;
+          activeCount++;
+        }
+      }
+
+      if (currentFallen !== fallenCount) {
+        fallenCount = currentFallen;
+        updateStatsUI();
+      }
+
+      if (activeCount > 0) {
+        waveCentroid.divideScalar(activeCount);
+        // Reject sudden multi-branch jumps (> 3.5m away) so camera glides smoothly without snapping
+        if (lastActiveWavePos.distanceTo(waveCentroid) < 3.5) {
+          lastActiveWavePos.lerp(waveCentroid, 0.08);
+        } else {
+          lastActiveWavePos.lerp(waveCentroid, 0.025);
+        }
+        if (waveDirection.lengthSq() > 0.001) {
+          waveDirection.normalize();
+          lastActiveWaveDir.lerp(waveDirection, 0.08).normalize();
+        }
+      }
+
+      return { activeCount };
+    }
+
+    function updateCameraDirector(dt, waveInfo) {
+      if (cameraMode === 'orbit') {
+        controls.update();
+        return;
+      }
+
+      const buildDef = currentDef;
+      const desiredTarget = new THREE.Vector3();
+      const desiredPos = new THREE.Vector3();
+
+      const tf = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
+      if (builderMode) {
+        // top-down drawing view; always shows at least a 15 m wide patch of floor, pinch/scroll to zoom
+        const h = (7.5 / (tf * Math.min(1, camera.aspect))) / builderZoom;
+        desiredTarget.set(0, 0, 0.15);
+        desiredPos.set(0, h, 0.9);
+      } else if (cameraMode === 'overhead') {
+        const need = Math.max((layoutExtent.d * 0.5 + 1.8) / tf, (layoutExtent.w * 0.5 + 1.8) / (tf * camera.aspect));
+        const h = BUILDS.includes(currentDef) ? Math.max(16.5, need) : Math.min(90, Math.max(9, need));
+        desiredTarget.set(0, 0.2, 0);
+        desiredPos.set(0.01, h, 2.2);
+      } else if (cameraMode === 'macro') {
+        if (isToppling) {
+          desiredTarget.copy(lastActiveWavePos).add(new THREE.Vector3(0, 0.15, 0));
+          const sideOffset = new THREE.Vector3(-lastActiveWaveDir.z, 0, lastActiveWaveDir.x).multiplyScalar(2.4);
+          const backOffset = lastActiveWaveDir.clone().multiplyScalar(-2.2);
+          desiredPos.copy(lastActiveWavePos).add(sideOffset).add(backOffset);
+          desiredPos.y = Math.max(0.85, lastActiveWavePos.y + 0.95);
+        } else if (starterDomino) {
+          const sp = starterDomino.body.position;
+          desiredTarget.set(sp.x, sp.y + 0.1, sp.z);
+          desiredPos.set(sp.x - 2.2, sp.y + 1.1, sp.z + 2.4);
+        }
+      } else {
+        // 'wave' (Default Dramatic Wave Tracker)
+        if (isToppling) {
+          desiredTarget.copy(lastActiveWavePos);
+          desiredPos.set(
+            lastActiveWavePos.x + 5.8,
+            Math.max(4.6, lastActiveWavePos.y + 4.4),
+            lastActiveWavePos.z + 6.8
+          );
+        } else {
+          desiredTarget.copy(buildDef.camTarget);
+          desiredPos.copy(buildDef.camPos);
+        }
+      }
+
+      // Allow manual orbit inspection if the user drags, then smoothly resume tracking
+      if (isUserDragging) {
+        controls.update();
+        smoothCamPos.copy(camera.position);
+        smoothCamTarget.copy(controls.target);
+        return;
+      }
+
+      const lerpAlpha = 1 - Math.exp(-dt * 2.6);
+      smoothCamPos.lerp(desiredPos, lerpAlpha);
+      smoothCamTarget.lerp(desiredTarget, lerpAlpha * 1.25);
+
+      camera.position.copy(smoothCamPos);
+      controls.target.copy(smoothCamTarget);
+      controls.update();
+    }
+
+    // Raycast Hover & Tap on Any Individual Domino (Mid-Line or Starter)
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let pointerDownPos = { x: 0, y: 0 };
+
+    function getHitDomino(clientX, clientY) {
+      pointer.x = (clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+
+      const meshes = dominoes.map(d => d.mesh);
+      const hits = raycaster.intersectObjects(meshes, false);
+      if (hits.length > 0) {
+        const hitMesh = hits[0].object;
+        return dominoes.find(d => d.mesh === hitMesh) || null;
+      }
+      return null;
+    }
+
+    renderer.domElement.addEventListener('pointermove', (e) => {
+      if (builderMode) return;
+      if (isUserDragging) {
+        hoverRing.visible = false;
+        renderer.domElement.style.cursor = 'grabbing';
+        return;
+      }
+      const hovered = getHitDomino(e.clientX, e.clientY);
+      if (hovered && !hovered.fallen && !hovered.isLintel) {
+        hoverRing.position.set(
+          hovered.body.position.x,
+          hovered.body.position.y - (DOMINO_H * hovered.scale) * 0.5 + 0.009,
+          hovered.body.position.z
+        );
+        hoverRing.visible = true;
+        renderer.domElement.style.cursor = 'pointer';
+      } else {
+        hoverRing.visible = false;
+        renderer.domElement.style.cursor = 'grab';
+      }
+    });
+
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+      if (!builderMode && openPane) closeSheet();
+      stopZen();
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+      if (builderMode || appear) return;
+      const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      if (dist > 6) return; // Ignore orbit drags
+
+      foley.init();
+      const target = getHitDomino(e.clientX, e.clientY);
+
+      if (target) {
+        if (target === starterDomino) starterRing.visible = false;
+        hoverRing.visible = false;
+
+        // Align click tap along the domino's chain axis (picking forward or reverse based on camera view)
+        const camForward = new THREE.Vector3();
+        camera.getWorldDirection(camForward).setY(0).normalize();
+        const chainDir = target.forwardDir.clone();
+        if (chainDir.dot(camForward) < 0) {
+          chainDir.negate();
+        }
+
+        applyCalibratedToppleImpulse(target, chainDir);
+
+        const toast = document.getElementById('hint-toast');
+        if (toast) toast.style.opacity = '0';
+      }
+    });
+
+    // =========================================================================
+    // 9. UI CONTROLS & EVENT BINDINGS
+    // =========================================================================
+    function setActiveButtonGroup(selector, activeEl) {
+      document.querySelectorAll(selector).forEach(btn => {
+        btn.classList.remove('btn-active');
+        btn.classList.add('btn-idle');
+      });
+      activeEl.classList.remove('btn-idle');
+      activeEl.classList.add('btn-active');
+    }
+
+    // ---- panels (one open at a time) --------------------------------------------------------------
+    let openPane = null;
+    function syncDock() {
+      $('tab-library').classList.toggle('open', openPane === 'library');
+      $('tab-studio').classList.toggle('open', openPane === 'studio');
+      $('btn-build').classList.toggle('open', builderMode);
+    }
+    function openSheet(name) {
+      for (const n of ['library', 'build', 'studio']) $('sheet-' + n).classList.toggle('hidden', n !== name);
+      $('sheet').classList.remove('hidden');
+      openPane = name; syncDock();
+    }
+    function closeSheet() { $('sheet').classList.add('hidden'); openPane = null; syncDock(); }
+    function toggleSheet(name) { openPane === name ? closeSheet() : openSheet(name); }
+    $('tab-library').addEventListener('click', () => toggleSheet('library'));
+    $('tab-studio').addEventListener('click', () => toggleSheet('studio'));
+
+    function setActiveSeg(selector, el) {
+      document.querySelectorAll(selector).forEach(b => { b.classList.remove('btn-active'); b.classList.add('btn-idle'); });
+      if (el) { el.classList.remove('btn-idle'); el.classList.add('btn-active'); }
+    }
+    let combineMode = false, comboSel = [];
+    const PAT_LABEL = {};
+    document.querySelectorAll('.pat-btn').forEach(b => { PAT_LABEL[b.dataset.pat] = b.textContent; });
+    function paintPatternButtons() {
+      document.querySelectorAll('.pat-btn').forEach(b => {
+        const id = b.dataset.pat;
+        const sel = combineMode ? comboSel : (currentDef.patternId ? [currentDef.patternId] : []);
+        const i = sel.indexOf(id);
+        b.textContent = PAT_LABEL[id] + (combineMode && i >= 0 ? '  ' + (i + 1) : '');
+        b.classList.toggle('btn-active', i >= 0);
+        b.classList.toggle('btn-idle', i < 0);
+      });
+      const tg = $('tg-combine');
+      tg.classList.toggle('btn-active', combineMode); tg.classList.toggle('btn-idle', !combineMode);
+      tg.setAttribute('aria-pressed', combineMode ? 'true' : 'false');
+      $('btn-reroll').classList.toggle('hidden', !(combineMode && comboSel.length >= 2));
+    }
+    function syncLibraryUI() {
+      const idx = BUILDS.indexOf(currentDef);
+      setActiveSeg('.build-btn', idx >= 0 ? document.querySelector('.build-btn[data-build="' + idx + '"]') : null);
+      if (currentDef.patternIds) { combineMode = true; comboSel = currentDef.patternIds.slice(); }
+      else if (currentDef.patternId && combineMode && comboSel.length < 2) comboSel = [currentDef.patternId];
+      paintPatternButtons();
+      document.querySelectorAll('.size-btn').forEach(b => {
+        const on = parseInt(b.dataset.size, 10) === currentSize;
+        b.classList.toggle('btn-active', on);
+        b.classList.toggle('text-stone-300', !on);
+      });
+      $('pat-info').textContent = (currentDef.patternId || currentDef.patternIds)
+        ? currentDef.title + ' · ' + dominoes.length + ' pieces'
+        : (idx >= 0 ? currentDef.title : 'Pick a pattern to generate a board.');
+      renderSaved();
+    }
+
+    // ---- library ---------------------------------------------------------------------------------
+    document.querySelectorAll('.build-btn').forEach(btn => {
+      btn.addEventListener('click', () => { foley.init(); stopZen(); loadBuild(parseInt(btn.dataset.build, 10)); });
+    });
+    function rollCombo() {
+      if (comboSel.length >= 2) selectComposite(comboSel, randomSeed(), currentSize);
+      else if (comboSel.length === 1) selectPattern(comboSel[0], randomSeed(), currentSize);
+    }
+    document.querySelectorAll('.pat-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        foley.init(); stopZen();
+        const id = btn.dataset.pat;
+        if (!combineMode) { selectPattern(id, randomSeed(), currentSize); return; }
+        const i = comboSel.indexOf(id);
+        if (i >= 0) comboSel.splice(i, 1);
+        else { comboSel.push(id); if (comboSel.length > 3) comboSel.shift(); }
+        paintPatternButtons();
+        rollCombo();
+      });
+    });
+    document.querySelectorAll('.size-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentSize = parseInt(btn.dataset.size, 10);
+        if (currentDef.patternIds) selectComposite(currentDef.patternIds, currentDef.seed, currentSize);
+        else if (currentDef.patternId) selectPattern(currentDef.patternId, currentDef.seed, currentSize);
+        else syncLibraryUI();
+      });
+    });
+    const patternIds = Object.keys(PATTERNS);
+    $('tg-combine').addEventListener('click', () => {
+      combineMode = !combineMode;
+      comboSel = combineMode ? (currentDef.patternIds ? currentDef.patternIds.slice() : currentDef.patternId ? [currentDef.patternId] : []) : [];
+      paintPatternButtons();
+      if (combineMode && !comboSel.length) showToast('Pick 2 or 3 patterns to mix');
+    });
+    $('btn-reroll').addEventListener('click', () => { foley.init(); stopZen(); rollCombo(); });
+    $('btn-surprise').addEventListener('click', () => {
+      foley.init(); stopZen();
+      const sz = [0, 1, 1, 2][Math.floor(Math.random() * 4)];
+      if (combineMode) {
+        const n = Math.random() < 0.6 ? 2 : 3, pool = patternIds.slice(), pick = [];
+        while (pick.length < n) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+        comboSel = pick; paintPatternButtons();
+        selectComposite(pick, randomSeed(), Math.min(sz, 1));
+      } else selectPattern(patternIds[Math.floor(Math.random() * patternIds.length)], randomSeed(), sz);
+    });
+
+    // ---- saving & sharing (localStorage is best-effort: private mode / blocked storage just disables it) ----
+    const SAVE_KEY = 'atelier.boards.v1', DRAFT_KEY = 'atelier.draft.v1', MAX_SAVED = 30;
+    function readSaved() { try { const a = JSON.parse(localStorage.getItem(SAVE_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+    function writeSaved(a) { try { localStorage.setItem(SAVE_KEY, JSON.stringify(a.slice(0, MAX_SAVED))); return true; } catch (e) { return false; } }
+    function makeThumb() {
+      try {
+        const W = 112, H = 72, c = document.createElement('canvas'); c.width = W; c.height = H;
+        const g = c.getContext('2d'); g.fillStyle = '#1c1917'; g.fillRect(0, 0, W, H);
+        const P = dominoes.filter(d => d.hx !== undefined);
+        if (!P.length) return '';
+        let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+        for (const d of P) { x0 = Math.min(x0, d.hx); x1 = Math.max(x1, d.hx); z0 = Math.min(z0, d.hz); z1 = Math.max(z1, d.hz); }
+        const pad = 7, sc = Math.min((W - 2 * pad) / Math.max(0.5, x1 - x0), (H - 2 * pad) / Math.max(0.5, z1 - z0));
+        const ox = W / 2 - (x0 + x1) / 2 * sc, oz = H / 2 - (z0 + z1) / 2 * sc, hl = Math.max(1.2, 0.17 * sc);
+        g.lineWidth = Math.max(1, 0.05 * sc * 1.6); g.lineCap = 'round'; g.strokeStyle = '#fcd34d';
+        g.beginPath();
+        for (const d of P) {
+          const px = ox + d.hx * sc, pz = oz + d.hz * sc, cx = Math.cos(d.hh) * hl, cz = -Math.sin(d.hh) * hl;
+          g.moveTo(px - cx, pz - cz); g.lineTo(px + cx, pz + cz);
+        }
+        g.stroke();
+        return c.toDataURL('image/png');
+      } catch (e) { return ''; }
+    }
+    function saveEntry(entry) {
+      entry.th = makeThumb();
+      const a = readSaved();
+      if (a.length >= MAX_SAVED) { showToast('Limit of ' + MAX_SAVED + ' saved boards, delete one first'); return; }
+      a.push(entry);
+      if (writeSaved(a)) { showToast('Saved to My boards'); renderSaved(); } else { a.pop(); showToast('Storage is full or blocked, delete a saved board'); }
+    }
+    function renderSaved() {
+      const a = readSaved(), list = $('saved-list');
+      $('saved-count').textContent = a.length ? '· ' + a.length : '';
+      try { bkStatus(); } catch (e) { /* not ready yet */ }
+      list.innerHTML = '';
+      if (!a.length) {
+        const p = document.createElement('p');
+        p.className = 'text-[11px] text-stone-500';
+        p.textContent = 'Nothing saved yet. Save a pattern or a board you drew.';
+        list.appendChild(p);
+        return;
+      }
+      a.forEach((e, i) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between gap-2 bg-white/5 rounded-lg px-2.5 py-1.5';
+        const left = document.createElement('span');
+        left.className = 'flex items-center gap-2 min-w-0';
+        if (e.th) { const im = document.createElement('img'); im.src = e.th; im.width = 56; im.height = 36; im.alt = ''; im.className = 'rounded shrink-0'; left.appendChild(im); }
+        const name = document.createElement('span');
+        name.className = 'text-[11px] text-stone-200 truncate cursor-text';
+        name.title = 'Tap to rename';
+        name.textContent = e.name;
+        name.addEventListener('click', () => {
+          const inp = document.createElement('input');
+          inp.value = e.name; inp.maxLength = 28;
+          inp.className = 'bg-black/40 border border-white/20 rounded px-1.5 py-0.5 text-[11px] text-stone-100 w-full min-w-0';
+          name.replaceWith(inp); inp.focus(); inp.select();
+          let done = false;
+          const fin = (ok) => { if (done) return; done = true; if (ok && inp.value.trim()) { const b = readSaved(); if (b[i]) { b[i].name = inp.value.trim(); writeSaved(b); } } renderSaved(); };
+          inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') fin(true); else if (ev.key === 'Escape') fin(false); });
+          inp.addEventListener('blur', () => fin(true));
+        });
+        left.appendChild(name);
+        const btns = document.createElement('span');
+        btns.className = 'flex gap-3 shrink-0 text-[11px]';
+        const load = document.createElement('button'); load.textContent = 'Load'; load.className = 'text-amber-200 hover:text-white';
+        const del = document.createElement('button'); del.textContent = 'Delete'; del.className = 'text-stone-500 hover:text-red-300';
+        load.addEventListener('click', () => { foley.init(); stopZen(); loadSavedEntry(e); });
+        del.addEventListener('click', () => { const b = readSaved(); b.splice(i, 1); writeSaved(b); renderSaved(); });
+        btns.append(load, del); row.append(left, btns); list.appendChild(row);
+      });
+    }
+    function loadSavedEntry(e) {
+      try {
+        if (e.k === 'm' && Array.isArray(e.ids) && e.ids.every(i => PATTERNS[i])) selectComposite(e.ids, e.seed >>> 0, Math.max(0, Math.min(2, e.size | 0)));
+        else if (e.k === 'p' && PATTERNS[e.id]) selectPattern(e.id, e.seed >>> 0, Math.max(0, Math.min(2, e.size | 0)));
+        else if (e.k === 'b') { builderSaved = decodeStrokes(e.d); loadBoard(builderDef); }
+      } catch (err) { showToast('That saved board could not be opened'); }
+    }
+    async function copyLink(hash) {
+      history.replaceState(null, '', hash);
+      const url = location.href.split('#')[0] + hash;
+      try { await navigator.clipboard.writeText(url); showToast('Link copied'); }
+      catch (e) { showToast('Link is in the address bar, copy it from there'); }
+    }
+    $('btn-pat-save').addEventListener('click', () => {
+      if (currentDef.patternIds) { saveEntry({ name: currentDef.title.replace(/ \+ /g, ' + ') + ' #' + currentDef.seed, k: 'm', ids: currentDef.patternIds, seed: currentDef.seed, size: currentDef.size }); return; }
+      if (!currentDef.patternId && currentDef === builderDef && builderSaved.length) { saveEntry({ name: 'My board ' + (readSaved().length + 1), k: 'b', d: encodeStrokes(builderSaved) }); return; }
+      if (!currentDef.patternId) { showToast('Generate a pattern first'); return; }
+      saveEntry({ name: currentDef.title + ' #' + currentDef.seed, k: 'p', id: currentDef.patternId, seed: currentDef.seed, size: currentDef.size });
+    });
+    $('btn-pat-share').addEventListener('click', () => {
+      if (currentDef.patternIds) copyLink(patternHash(currentDef));
+      else if (currentDef.patternId) copyLink('#p=' + currentDef.patternId + '.' + currentDef.seed + '.' + currentDef.size);
+      else if (currentDef === builderDef && builderSaved.length) copyLink('#b=' + encodeStrokes(builderSaved));
+      else { const i = BUILDS.indexOf(currentDef); if (i >= 0) copyLink('#c=' + i); }
+    });
+
+    // ---- builder -----------------------------------------------------------------------------------
+    let builderMode = false, builderSaved = [], builderLive = [], activeStroke = null, builderZoom = 1, prevCameraMode = 'wave';
+    const builderDef = {
+      title: 'Your board', camPos: new THREE.Vector3(0, 14, 6), camTarget: new THREE.Vector3(0, 0, 0),
+      build() { builderLive = replayStrokes(builderSaved); }
+    };
+    function updateBuildCount() { $('build-count').textContent = dominoes.length; $('stat-total').textContent = dominoes.length; }
+    function autosaveDraft() { try { localStorage.setItem(DRAFT_KEY, builderSaved.length ? encodeStrokes(builderSaved) : ''); } catch (e) { /* storage blocked */ } }
+    function setCameraMode(mode) {
+      cameraMode = mode;
+      setActiveSeg('.cam-btn', document.querySelector('.cam-btn[data-cam="' + mode + '"]'));
+    }
+    function enterBuild() {
+      if (builderMode) return;
+      if (currentDef !== builderDef) {
+        const prev = null;
+        loadDef(builderDef);
+        afterLoad(builderDef, prev);
+        history.replaceState(null, '', location.href.split('#')[0]);
+      }
+      builderMode = true;
+      prevCameraMode = cameraMode;
+      setCameraMode('overhead');
+      controls.enabled = false;
+      hoverRing.visible = false;
+      renderer.domElement.style.cursor = 'crosshair';
+      $('hint-toast').style.opacity = '0';
+      $('build-cap').textContent = PIECE_CAP;
+      updateBuildCount();
+      openSheet('build');
+    }
+    function exitBuild(silent) {
+      if (!builderMode) return;
+      cancelActiveStroke();
+      builderMode = false;
+      controls.enabled = true;
+      setCameraMode(prevCameraMode);
+      finishBuilderBoard();
+      renderer.domElement.style.cursor = 'grab';
+      if (openPane === 'build') closeSheet(); else syncDock();
+      if (!silent && !dominoes.length) showToast('Nothing drawn yet');
+      autosaveDraft();
+    }
+    function cancelActiveStroke() {
+      const st = activeStroke; activeStroke = null;
+      if (st) { removeStroke(st); updateBuildCount(); }
+    }
+    function commitStroke() {
+      const st = activeStroke; activeStroke = null;
+      if (!st) return;
+      strokeAdvance(st, true);
+      if (!st.recs.length) { strokeUnshift(st); return; }
+      builderLive.push(st);
+      builderSaved.push({ samples: st.samples.slice(), fork: st.fork, extend: st.extend });
+      finishBuilderBoard();
+      if (st.blocked) showToast(dominoes.length >= PIECE_CAP ? 'Piece limit reached' : 'Stopped, the line would overlap a piece');
+      updateBuildCount();
+      autosaveDraft();
+    }
+    function undoStroke() {
+      const st = builderLive.pop();
+      if (!st) return;
+      builderSaved.pop();
+      removeStroke(st);
+      finishBuilderBoard();
+      updateBuildCount();
+      autosaveDraft();
+    }
+    $('btn-build').addEventListener('click', () => {
+      foley.init(); stopZen();
+      if (!builderMode) enterBuild();
+      else toggleSheet('build');
+    });
+    $('btn-undo').addEventListener('click', undoStroke);
+    $('btn-clear').addEventListener('click', () => { while (builderLive.length) undoStroke(); });
+    $('btn-build-done').addEventListener('click', () => exitBuild());
+    $('btn-build-save').addEventListener('click', () => {
+      if (!builderSaved.length) { showToast('Draw something first'); return; }
+      saveEntry({ name: 'My board ' + (readSaved().length + 1) + ' · ' + dominoes.length + ' pieces', k: 'b', d: encodeStrokes(builderSaved) });
+    });
+    $('btn-build-share').addEventListener('click', () => {
+      if (!builderSaved.length) { showToast('Draw something first'); return; }
+      copyLink('#b=' + encodeStrokes(builderSaved));
+    });
+
+    const _plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), _hit = new THREE.Vector3();
+    function floorPoint(cx, cy) {
+      pointer.x = (cx / window.innerWidth) * 2 - 1;
+      pointer.y = -(cy / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      if (!raycaster.ray.intersectPlane(_plane, _hit)) return null;
+      const c = (v) => Math.max(-FIELD_HALF, Math.min(FIELD_HALF, Math.round(v * 100) / 100));
+      return { x: c(_hit.x), z: c(_hit.z) };
+    }
+    const bptrs = new Map();
+    let pinchD0 = 1, pinchZ0 = 1;
+    const cvs = renderer.domElement;
+    cvs.addEventListener('pointerdown', (e) => {
+      if (!builderMode) return;
+      bptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (bptrs.size === 2) {
+        cancelActiveStroke();
+        const [p, q] = [...bptrs.values()];
+        pinchD0 = Math.max(1, Math.hypot(p.x - q.x, p.y - q.y)); pinchZ0 = builderZoom;
+        return;
+      }
+      if (bptrs.size > 1 || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      if (dominoes.length >= PIECE_CAP) { showToast('Piece limit reached (' + PIECE_CAP + ')'); return; }
+      const p = floorPoint(e.clientX, e.clientY);
+      if (!p) return;
+      activeStroke = newStroke(p.x, p.z);
+      strokeAttach(activeStroke);
+      try { cvs.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    });
+    cvs.addEventListener('pointermove', (e) => {
+      if (!builderMode) return;
+      if (bptrs.has(e.pointerId)) bptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (bptrs.size === 2) {
+        const [p, q] = [...bptrs.values()];
+        builderZoom = Math.max(0.4, Math.min(2.2, pinchZ0 * Math.hypot(p.x - q.x, p.y - q.y) / pinchD0));
+        return;
+      }
+      if (!activeStroke) return;
+      const p = floorPoint(e.clientX, e.clientY);
+      if (!p) return;
+      const last = activeStroke.samples[activeStroke.samples.length - 1];
+      if (Math.hypot(p.x - last.x, p.z - last.z) >= 0.12) {
+        activeStroke.samples.push(p);
+        strokeAdvance(activeStroke, false);
+        updateBuildCount();
+      }
+    });
+    const endPointer = (e) => {
+      bptrs.delete(e.pointerId);
+      if (builderMode && !bptrs.size) commitStroke();
+    };
+    cvs.addEventListener('pointerup', endPointer);
+    cvs.addEventListener('pointercancel', endPointer);
+    cvs.addEventListener('wheel', (e) => {
+      if (!builderMode) return;
+      e.preventDefault();
+      builderZoom = Math.max(0.4, Math.min(2.2, builderZoom * Math.exp(-e.deltaY * 0.0012)));
+    }, { passive: false });
+
+    // ---- zen loop & stall assist --------------------------------------------------------------------
+    const zen = { on: false, phase: 'wait', t: 0 };
+    function stopZen() {
+      if (!zen.on) return;
+      zen.on = false;
+      $('tg-zen').classList.replace('btn-active', 'btn-idle');
+    }
+    $('tg-zen').addEventListener('click', () => {
+      foley.init();
+      if (builderMode) exitBuild(true);
+      zen.on = !zen.on;
+      $('tg-zen').classList.toggle('btn-active', zen.on);
+      $('tg-zen').classList.toggle('btn-idle', !zen.on);
+      if (zen.on) {
+        closeSheet();
+        $('hint-toast').style.opacity = '0';
+        zen.phase = 'wait'; zen.t = performance.now();
+        if (isToppling || dominoes.some(d => d.activated)) loadBoard(currentDef);
+      }
+    });
+    function updateZen(now) {
+      if (!zen.on || builderMode || document.hidden || appear) return;
+      if (zen.phase === 'wait') {
+        if (now - Math.max(zen.t, appearDoneAt) > 1500) { triggerStarterDomino(); zen.phase = 'run'; zen.t = now; }
+      } else if (zen.phase === 'run') {
+        if ((isToppling && now - lastActMs > 2800) || now - zen.t > 240000) { zen.phase = 'rest'; zen.t = now; }
+      } else if (now - zen.t > 2200) {
+        const others = patternIds.filter(p => p !== currentDef.patternId);
+        selectPattern(others[Math.floor(Math.random() * others.length)], randomSeed(), [0, 1, 1, 2][Math.floor(Math.random() * 4)]);
+        zen.phase = 'wait'; zen.t = now;
+      }
+    }
+    // If a wave dies before the end (a junction that didn't catch), nudge the nearest standing piece in front of
+    // the dead front. At most 10 nudges per run.
+    function updateAssist(now) {
+      if (!isToppling || appear || builderMode || assistCount >= 10) return;
+      if (now - lastActMs < 1100 || now - assistCheckAt < 400) return;
+      assistCheckAt = now;
+      const a = assistStall(lastFront.x, lastFront.z);
+      if (a) { assistCount++; lastActMs = now; lastFront.copy(a.body.position); foley.playImpact(2.0, a.body.position.x, false); }
+    }
+
+    // Trigger, Reset and Camera Mode Buttons
+    $('btn-trigger').addEventListener('click', () => { stopZen(); triggerStarterDomino(); });
+    $('btn-reset').addEventListener('click', () => {
+      foley.init(); stopZen();
+      if (builderMode) { exitBuild(true); }
+      loadBoard(currentDef);
+    });
+    document.querySelectorAll('.cam-btn').forEach(btn => {
+      btn.addEventListener('click', () => { if (!builderMode) setCameraMode(btn.dataset.cam); });
+    });
+    $('tg-chimes').addEventListener('click', () => {
+      foley.chimes = !foley.chimes;
+      $('tg-chimes').classList.toggle('btn-active', foley.chimes);
+      $('tg-chimes').classList.toggle('btn-idle', !foley.chimes);
+    });
+    $('tg-haptics').addEventListener('click', () => {
+      foley.haptics = !foley.haptics;
+      $('tg-haptics').classList.toggle('btn-active', foley.haptics);
+      $('tg-haptics').classList.toggle('btn-idle', !foley.haptics);
+      if (foley.haptics) {
+        if (typeof navigator.vibrate === 'function') navigator.vibrate(18);
+        else showToast('This device does not support vibration');
+      }
+    });
+
+    // Time Scale (Bullet-Time) Buttons
+    document.querySelectorAll('.speed-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.speed-btn').forEach(b => {
+          b.classList.remove('btn-active');
+          b.classList.add('text-stone-300');
+        });
+        btn.classList.add('btn-active');
+        btn.classList.remove('text-stone-300');
+        timeScale = parseFloat(btn.dataset.speed);
+        foley.timeScale = timeScale;
+      });
+    });
+
+    // Tactile Material Palette Buttons
+    document.querySelectorAll('.mat-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.mat-btn').forEach(b => {
+          b.classList.remove('ring-2', 'ring-amber-300', 'ring-offset-2', 'ring-offset-stone-900');
+          b.classList.add('opacity-75');
+        });
+        btn.classList.add('ring-2', 'ring-amber-300', 'ring-offset-2', 'ring-offset-stone-900');
+        btn.classList.remove('opacity-75');
+
+        currentMaterialKey = btn.dataset.mat;
+        foley.materialType = currentMaterialKey;
+
+        const palette = MATERIAL_PALETTES[currentMaterialKey];
+        for (const d of dominoes) {
+          d.mesh.material = palette[d.colorSlot % palette.length];
+        }
+      });
+    });
+
+    // Foley Audio Mute Toggle
+    const btnAudio = document.getElementById('btn-audio');
+    btnAudio.addEventListener('click', () => {
+      foley.init();
+      foley.enabled = !foley.enabled;
+      document.getElementById('icon-audio-on').classList.toggle('hidden', !foley.enabled);
+      document.getElementById('icon-audio-off').classList.toggle('hidden', foley.enabled);
+    });
+
+    // Cinema Mode (Hide/Show HUD)
+    const hudTop = document.getElementById('hud-top');
+    const hudBottom = document.getElementById('hud-bottom');
+    const btnShowUI = document.getElementById('btn-show-ui');
+
+    document.getElementById('btn-hide-ui').addEventListener('click', () => {
+      hudTop.classList.add('opacity-0', 'pointer-events-none');
+      hudBottom.classList.add('opacity-0', 'translate-y-6', 'pointer-events-none');
+      btnShowUI.classList.remove('hidden');
+      btnShowUI.classList.add('flex');
+    });
+
+    btnShowUI.addEventListener('click', () => {
+      hudTop.classList.remove('opacity-0', 'pointer-events-none');
+      hudBottom.classList.remove('opacity-0', 'translate-y-6', 'pointer-events-none');
+      btnShowUI.classList.add('hidden');
+      btnShowUI.classList.remove('flex');
+    });
+
+    // Spacebar shortcut to trigger or rebuild
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        stopZen();
+        if (builderMode) return;
+        if (!isToppling) {
+          triggerStarterDomino();
+        } else {
+          loadBoard(currentDef);
+        }
+      }
+    });
+
+    // Responsive Resize Handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      composer.setPixelRatio(renderer.getPixelRatio());
+      composer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // =========================================================================
+    // 10. MAIN RENDER & FIXED-STEP PHYSICS LOOP
+    // =========================================================================
+    const clock = new THREE.Clock();
+    let pulseTime = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const rawDt = Math.min(clock.getDelta(), 0.05);
+      const scaledDt = rawDt * timeScale;
+      pulseTime += rawDt;
+
+      // Subtle breathing pulse on starter ring
+      if (starterRing.visible) {
+        const s = 1 + Math.sin(pulseTime * 4) * 0.08;
+        starterRing.scale.set(s, s, 1);
+        starterRingMat.opacity = 0.55 + Math.sin(pulseTime * 4) * 0.25;
+      }
+
+      // Fixed-step rigid-body physics (120Hz); time scale (bullet-time) just feeds in less time per frame
+      if (scaledDt > 0) {
+        stepPhysics(scaledDt);
+      }
+
+      const waveInfo = updateDominoStatesAndWave();
+      updateAppear(rawDt);
+      const nowMs = performance.now();
+      updateAssist(nowMs);
+      updateZen(nowMs);
+      updateCameraDirector(rawDt, waveInfo);
+
+      composer.render();
+    }
+
+
+    // ---- backup / restore, install, back-button guard ---------------------------------------------------
+    const APP_VERSION = '2.1';
+    const BK_KEY = 'atelier.lastBackup.v1';
+    $('app-ver').textContent = APP_VERSION;
+    const B64 = /^[A-Za-z0-9+/=]+$/;
+    function cleanEntry(e) {
+      if (!e || typeof e !== 'object') return null;
+      const name = String(e.name == null ? '' : e.name).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 40);
+      const size = Math.max(0, Math.min(2, e.size | 0)), seed = (+e.seed >>> 0) || 1;
+      let out = null;
+      const isPat = (id) => typeof id === 'string' && Object.prototype.hasOwnProperty.call(PATTERNS, id);
+      if (e.k === 'p' && isPat(e.id)) out = { name: name || PATTERNS[e.id].name + ' #' + seed, k: 'p', id: e.id, seed, size };
+      else if (e.k === 'm' && Array.isArray(e.ids) && e.ids.length >= 2 && e.ids.length <= 3 && e.ids.every(isPat))
+        out = { name: name || 'Mix #' + seed, k: 'm', ids: e.ids.slice(), seed, size };
+      else if (e.k === 'b' && typeof e.d === 'string' && /^[A-Za-z0-9_-]{1,120000}$/.test(e.d)) {
+        let ok = false; try { ok = decodeStrokes(e.d).length > 0; } catch (err) { ok = false; }
+        if (ok) out = { name: name || 'My board', k: 'b', d: e.d };
+      }
+      if (!out) return null;
+      if (typeof e.th === 'string' && e.th.length < 30000 && e.th.startsWith('data:image/png;base64,') && B64.test(e.th.slice(22))) out.th = e.th;
+      return out;
+    }
+    const entryKey = (e) => e.k === 'b' ? 'b:' + e.d : e.k + ':' + (e.ids ? e.ids.join('+') : e.id) + ':' + e.seed + ':' + e.size;
+    function buildBackup() {
+      let draft = ''; try { draft = localStorage.getItem(DRAFT_KEY) || ''; } catch (err) { /* blocked */ }
+      return { app: 'atelier-domino', format: 1, appVersion: APP_VERSION, savedAt: new Date().toISOString(), boards: readSaved(), draft };
+    }
+    function bkStatus() {
+      const n = readSaved().length;
+      let last = null; try { last = localStorage.getItem(BK_KEY); } catch (err) { /* blocked */ }
+      const days = last ? Math.floor((Date.now() - Date.parse(last)) / 864e5) : null;
+      const needs = n > 0 && (!last || days >= 14);
+      $('bk-dot').classList.toggle('hidden', !needs);
+      $('bk-status').textContent = n + ' saved board' + (n === 1 ? '' : 's') + ' · ' +
+        (last ? 'last backup ' + (days <= 0 ? 'today' : days + ' day' + (days === 1 ? '' : 's') + ' ago') : 'never backed up');
+      if (navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(p => {
+        $('bk-hint').dataset.p = p ? '1' : '0';
+        $('bk-status').textContent += p ? ' · storage protected' : '';
+      }).catch(() => {});
+    }
+    async function exportBackup() {
+      const data = buildBackup();
+      if (!data.boards.length && !data.draft) { showToast('Nothing to back up yet'); return; }
+      const name = 'atelier-domino-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+      const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+      const file = new File([blob], name, { type: 'application/json' });
+      let done = false;
+      if (matchMedia('(pointer: coarse)').matches && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: 'Atelier Domino backup' }); done = true; }
+        catch (err) { if (err && err.name === 'AbortError') return; }
+      }
+      if (!done) {
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      }
+      try { localStorage.setItem(BK_KEY, new Date().toISOString()); } catch (err) { /* blocked */ }
+      showToast('Backup saved (' + data.boards.length + ' boards)'); bkStatus();
+    }
+    function importBackup(text) {
+      let data; try { data = JSON.parse(text); } catch (err) { showToast('That file is not a valid backup'); return; }
+      if (!data || data.app !== 'atelier-domino' || !Array.isArray(data.boards)) { showToast('That file is not an Atelier Domino backup'); return; }
+      const have = readSaved(), seen = new Set(have.map(entryKey)), incoming = data.boards.map(cleanEntry).filter(Boolean);
+      if (typeof data.draft === 'string' && data.draft) {
+        const d = cleanEntry({ k: 'b', d: data.draft, name: 'Restored draft' });
+        if (d) incoming.push(d);
+      }
+      let added = 0, dup = 0, over = 0;
+      for (const e of incoming) {
+        if (seen.has(entryKey(e))) { dup++; continue; }
+        if (have.length >= MAX_SAVED) { over++; continue; }
+        have.push(e); seen.add(entryKey(e)); added++;
+      }
+      if (added && !writeSaved(have)) { showToast('Storage is full or blocked, nothing was restored'); return; }
+      renderSaved(); bkStatus();
+      showToast('Restored ' + added + (dup ? ', ' + dup + ' already here' : '') + (over ? ', ' + over + ' over the ' + MAX_SAVED + ' limit' : ''), 4200);
+    }
+    $('btn-bk-export').addEventListener('click', exportBackup);
+    $('btn-bk-import').addEventListener('click', () => $('bk-file').click());
+    $('bk-file').addEventListener('change', (ev) => {
+      const f = ev.target.files && ev.target.files[0]; ev.target.value = '';
+      if (!f) return;
+      if (f.size > 8 * 1024 * 1024) { showToast('That file is too large to be a backup'); return; }
+      const r = new FileReader(); r.onload = () => importBackup(String(r.result)); r.onerror = () => showToast('Could not read that file'); r.readAsText(f);
+    });
+    // keep the browser from clearing saved boards under storage pressure
+    function askPersist() { try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(bkStatus).catch(() => {}); } catch (err) { /* unsupported */ } }
+    // install
+    let installEvt = null;
+    window.addEventListener('beforeinstallprompt', (ev) => { ev.preventDefault(); installEvt = ev; $('btn-install').classList.remove('hidden'); });
+    window.addEventListener('appinstalled', () => { installEvt = null; $('btn-install').classList.add('hidden'); showToast('Installed'); });
+    $('btn-install').addEventListener('click', async () => {
+      if (!installEvt) return;
+      installEvt.prompt(); try { await installEvt.userChoice; } catch (err) { /* dismissed */ }
+      installEvt = null; $('btn-install').classList.add('hidden');
+    });
+    const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    if (!standalone && /iphone|ipad|ipod/i.test(navigator.userAgent)) $('bk-hint').textContent += ' To install on iPhone: Share, then Add to Home Screen.';
+    // back button: close whatever is open first, then ask for a second press before leaving
+    function installBackGuard() {
+      const mark = () => history.pushState({ atelierGuard: 1 }, '', location.href);
+      let armed = false, timer = 0;
+      mark();
+      window.addEventListener('popstate', () => {
+        if (zen.on) { stopZen(); mark(); return; }
+        if (builderMode) { exitBuild(); mark(); return; }
+        if (openPane) { closeSheet(); mark(); return; }
+        if (!btnShowUI.classList.contains('hidden')) { btnShowUI.click(); mark(); return; }
+        if (!armed) { armed = true; showToast('Press back again to exit', 2000); mark(); clearTimeout(timer); timer = setTimeout(() => { armed = false; }, 2200); return; }
+        clearTimeout(timer); history.back();
+      });
+    }
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+    }
+
+    // Boot Sequence
+    function bootFromHash() {
+      const h = location.hash || '';
+      try {
+        let m;
+        if ((m = /^#p=([a-z]+)\.(\d+)\.([012])$/.exec(h)) && PATTERNS[m[1]]) { selectPattern(m[1], parseInt(m[2], 10) >>> 0, parseInt(m[3], 10)); return; }
+        if ((m = /^#m=([a-z+]+)\.(\d+)\.([012])$/.exec(h))) { const ids = m[1].split('+'); if (ids.length >= 2 && ids.length <= 3 && ids.every(i => PATTERNS[i])) { if (selectComposite(ids, parseInt(m[2], 10) >>> 0, parseInt(m[3], 10))) return; } }
+        if ((m = /^#c=([0-4])$/.exec(h))) { loadBuild(parseInt(m[1], 10)); return; }
+        if ((m = /^#b=([A-Za-z0-9_-]+)$/.exec(h))) { builderSaved = decodeStrokes(m[1]); loadBoard(builderDef); return; }
+      } catch (e) { /* fall through to the default board */ }
+      loadBuild(0);
+    }
+    window.addEventListener('load', () => {
+      bootFromHash();
+      installBackGuard(); bkStatus(); askPersist();
+      const loader = document.getElementById('loader-overlay');
+      setTimeout(() => {
+        loader.style.opacity = '0';
+        setTimeout(() => loader.remove(), 700);
+      }, 350);
+      animate();
+    });
+  </script>
+</body>
+</html>
