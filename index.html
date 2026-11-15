@@ -1,0 +1,1755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Atelier Domino — 3D Kinetic Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #1c1917;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+    .font-serif-display {
+      font-family: 'Playfair Display', Georgia, serif;
+    }
+    .glass-panel {
+      background: rgba(24, 22, 20, 0.72);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 248, 235, 0.12);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+    .glass-pill {
+      background: rgba(24, 22, 20, 0.65);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 248, 235, 0.12);
+    }
+    .btn-active {
+      background: rgba(245, 235, 220, 0.94);
+      color: #1c1917;
+      border-color: rgba(255, 255, 255, 0.8);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    }
+    .btn-idle {
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(245, 240, 232, 0.82);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+    .btn-idle:hover {
+      background: rgba(255, 255, 255, 0.11);
+      color: #ffffff;
+    }
+    /* Custom subtle scrollbar for mobile horizontal strips */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+
+  <!-- ES Module Shims & Import Map for Three.js + Addons + Cannon-es -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/",
+        "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- 3D Viewport Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Loading Overlay -->
+  <div id="loader-overlay" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#191614] text-[#f5efe6] transition-opacity duration-700">
+    <div class="w-12 h-12 rounded-2xl border border-amber-200/30 flex items-center justify-center mb-4 animate-pulse bg-amber-100/5">
+      <div class="w-3 h-6 rounded-sm bg-amber-200/80 transform -rotate-12"></div>
+    </div>
+    <h1 class="font-serif-display text-2xl tracking-wide text-amber-50">Atelier Domino</h1>
+    <p id="loader-status" class="text-xs uppercase tracking-[0.22em] text-stone-400 mt-2">Crafting Studio Textures &amp; Physics...</p>
+  </div>
+
+  <!-- Top Minimal Header Bar -->
+  <header id="hud-top" class="fixed top-0 left-0 right-0 z-20 p-3 sm:p-5 flex items-start justify-between pointer-events-none transition-opacity duration-300">
+    <!-- Brand & Live Telemetry -->
+    <div class="glass-panel rounded-2xl px-4 py-3 pointer-events-auto flex items-center gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"></span>
+          <h1 class="font-serif-display text-base sm:text-lg text-amber-50 tracking-wide leading-none">Atelier Domino</h1>
+        </div>
+        <p id="build-subtitle" class="text-[11px] text-stone-400 mt-1">01 · The Grand Helix &amp; Starburst</p>
+      </div>
+
+      <div class="h-7 w-px bg-white/10 hidden sm:block"></div>
+
+      <!-- Counter -->
+      <div class="flex items-center gap-3">
+        <div class="text-right">
+          <div class="text-[10px] uppercase tracking-wider text-stone-400">Fallen</div>
+          <div class="text-sm sm:text-base font-semibold text-amber-100 tabular-nums">
+            <span id="stat-fallen">0</span><span class="text-stone-500 font-normal"> / <span id="stat-total">0</span></span>
+          </div>
+        </div>
+        <!-- Progress Ring -->
+        <svg class="w-8 h-8 -rotate-90" viewBox="0 0 36 36">
+          <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3"></circle>
+          <circle id="progress-ring" cx="18" cy="18" r="14" fill="none" stroke="#fbbf24" stroke-width="3" stroke-dasharray="87.96" stroke-dashoffset="87.96" stroke-linecap="round"></circle>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Top Right Utility Controls: Audio & Cinema Mode -->
+    <div class="flex items-center gap-2 pointer-events-auto">
+      <button id="btn-audio" title="Toggle Procedural Foley Audio" class="glass-pill rounded-xl p-2.5 sm:px-3.5 sm:py-2.5 text-stone-200 hover:text-white hover:bg-white/10 transition flex items-center gap-2 text-xs font-medium">
+        <svg id="icon-audio-on" class="w-4 h-4 text-amber-300" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/>
+        </svg>
+        <svg id="icon-audio-off" class="w-4 h-4 text-stone-400 hidden" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/>
+        </svg>
+        <span class="hidden sm:inline">Foley Sound</span>
+      </button>
+
+      <button id="btn-hide-ui" title="Cinema Mode (Hide UI)" class="glass-pill rounded-xl p-2.5 sm:px-3.5 sm:py-2.5 text-stone-200 hover:text-white hover:bg-white/10 transition flex items-center gap-2 text-xs font-medium">
+        <svg class="w-4 h-4 text-amber-200" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+        </svg>
+        <span class="hidden sm:inline">Cinema Mode</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Floating Restore UI Pill (Shown only in Cinema Mode) -->
+  <button id="btn-show-ui" class="fixed top-4 right-4 z-30 glass-pill rounded-full px-4 py-2 text-xs font-medium text-amber-100 hover:bg-white/15 transition hidden items-center gap-2 shadow-lg">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+    <span>Show Studio Controls</span>
+  </button>
+
+  <!-- Subtle Interactive Hint Toast -->
+  <div id="hint-toast" class="fixed top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-opacity duration-500">
+    <div class="glass-pill rounded-full px-4 py-1.5 text-[11px] text-amber-100/90 tracking-wide flex items-center gap-2 shadow-lg">
+      <span class="w-1.5 h-1.5 rounded-full bg-amber-300 animate-ping"></span>
+      <span>Hover &amp; click <strong>any domino</strong> to tip it along the line, or press <strong>Trigger Topple</strong></span>
+    </div>
+  </div>
+
+  <!-- Bottom Floating Studio Dock -->
+  <footer id="hud-bottom" class="fixed bottom-0 left-0 right-0 z-20 p-3 sm:p-5 flex flex-col items-center pointer-events-none transition-all duration-300">
+    <div class="glass-panel rounded-3xl p-3 sm:p-4 w-full max-w-5xl pointer-events-auto flex flex-col gap-3">
+      
+      <!-- Top Row: Architectural Builds + Primary Action Controls -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        
+        <!-- Build Selector Strip -->
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 lg:pb-0">
+          <span class="text-[10px] uppercase tracking-widest text-stone-400 mr-1.5 hidden sm:inline shrink-0">Builds</span>
+          <button data-build="0" class="build-btn btn-active rounded-xl px-3 py-2 text-xs font-medium border transition shrink-0">
+            01 · Grand Helix
+          </button>
+          <button data-build="1" class="build-btn btn-idle rounded-xl px-3 py-2 text-xs font-medium border transition shrink-0">
+            02 · Viaduct &amp; Steps
+          </button>
+          <button data-build="2" class="build-btn btn-idle rounded-xl px-3 py-2 text-xs font-medium border transition shrink-0">
+            03 · Kinetic Mandala
+          </button>
+          <button data-build="3" class="build-btn btn-idle rounded-xl px-3 py-2 text-xs font-medium border transition shrink-0">
+            04 · Cathedral Wall
+          </button>
+        </div>
+
+        <!-- Primary Action Buttons -->
+        <div class="flex items-center gap-2 shrink-0">
+          <button id="btn-trigger" class="flex-1 sm:flex-initial bg-gradient-to-r from-amber-200 via-amber-100 to-orange-100 hover:from-white hover:to-amber-50 text-stone-900 font-semibold text-xs px-5 py-2.5 rounded-xl shadow-[0_6px_24px_rgba(251,191,36,0.28)] active:scale-[0.98] transition flex items-center justify-center gap-2">
+            <svg class="w-4 h-4 text-amber-800" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            <span>Trigger Topple</span>
+          </button>
+
+          <button id="btn-reset" class="btn-idle border rounded-xl px-3.5 py-2.5 text-xs font-medium transition flex items-center justify-center gap-1.5" title="Rebuild Structure">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span>Rebuild</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="h-px w-full bg-white/10"></div>
+
+      <!-- Bottom Row: Camera Director, Slow-Mo Time Scale, and Material Finish -->
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        
+        <!-- Camera Director Modes -->
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          <span class="text-[10px] uppercase tracking-widest text-stone-400 mr-1 hidden md:inline">Camera</span>
+          <button data-cam="wave" class="cam-btn btn-active rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition shrink-0">
+            Wave Tracker
+          </button>
+          <button data-cam="macro" class="cam-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition shrink-0">
+            Low Macro
+          </button>
+          <button data-cam="overhead" class="cam-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition shrink-0">
+            Architect Top
+          </button>
+          <button data-cam="orbit" class="cam-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition shrink-0">
+            Free Orbit
+          </button>
+        </div>
+
+        <!-- Right Cluster: Time Scale + Tactile Material Palette -->
+        <div class="flex items-center gap-3 ml-auto">
+          
+          <!-- Time Scale / Bullet Time -->
+          <div class="flex items-center bg-black/30 rounded-lg p-0.5 border border-white/10">
+            <button data-speed="1.0" class="speed-btn btn-active rounded-md px-2 py-1 text-[11px] font-medium transition">1.0×
+            </button>
+            <button data-speed="0.5" class="speed-btn text-stone-300 hover:text-white rounded-md px-2 py-1 text-[11px] font-medium transition">0.5×
+            </button>
+            <button data-speed="0.25" class="speed-btn text-stone-300 hover:text-white rounded-md px-2 py-1 text-[11px] font-medium transition" title="Bullet-Time Slow Motion">0.25×
+            </button>
+          </div>
+
+          <!-- Material Finish Selector -->
+          <div class="flex items-center gap-1.5" title="Domino Material Finish">
+            <button data-mat="resin" class="mat-btn ring-2 ring-amber-300 ring-offset-2 ring-offset-stone-900 rounded-full w-6 h-6 transition flex items-center justify-center overflow-hidden shadow-md" style="background: linear-gradient(135deg, #fbf8f3 50%, #262322 50%);" title="Polished Resin & Gold"></button>
+            <button data-mat="wood" class="mat-btn opacity-75 hover:opacity-100 rounded-full w-6 h-6 transition flex items-center justify-center overflow-hidden shadow-md" style="background: linear-gradient(135deg, #deb887 50%, #5c3a21 50%);" title="Beechwood & Walnut"></button>
+            <button data-mat="ceramic" class="mat-btn opacity-75 hover:opacity-100 rounded-full w-6 h-6 transition flex items-center justify-center overflow-hidden shadow-md" style="background: linear-gradient(135deg, #8da399 50%, #c87d65 50%);" title="Matte Architectural Ceramic"></button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </footer>
+
+  <!-- Main Application Script -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+    import * as CANNON from 'cannon-es';
+
+    // =========================================================================
+    // 1. PROCEDURAL VELOCITY-MAPPED WEB AUDIO FOLEY SYNTHESIZER
+    // =========================================================================
+    class ProceduralFoleyAudio {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+        this.materialType = 'resin';
+        this.timeScale = 1.0;
+        this.lastTriggerTime = 0;
+        this.activeVoices = 0;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            this.ctx = new AudioCtx();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playImpact(velocity, panX = 0, isFloor = false) {
+        if (!this.enabled || !this.ctx || this.ctx.state !== 'running') return;
+        const now = this.ctx.currentTime;
+        if (now - this.lastTriggerTime < 0.014 || this.activeVoices > 18) return;
+        this.lastTriggerTime = now;
+
+        const normVel = Math.min(1, Math.max(0.05, (velocity - 0.5) / 6.5));
+        const gainVal = Math.pow(normVel, 1.35) * (isFloor ? 0.14 : 0.24);
+        if (gainVal < 0.008) return;
+
+        this.activeVoices++;
+
+        const osc = this.ctx.createOscillator();
+        const clickOsc = this.ctx.createOscillator();
+        const filter = this.ctx.createBiquadFilter();
+        const gain = this.ctx.createGain();
+        const panner = this.ctx.createStereoPanner();
+
+        panner.pan.value = Math.max(-0.85, Math.min(0.85, panX / 9));
+
+        const pitchJitter = 0.93 + Math.random() * 0.14;
+        const slowMoPitch = 0.72 + 0.28 * this.timeScale;
+
+        let baseFreq = 1180;
+        let clickFreq = 3200;
+        let qVal = 4.2;
+        let decay = 0.042;
+
+        if (this.materialType === 'wood') {
+          baseFreq = isFloor ? 520 : 760;
+          clickFreq = 1850;
+          qVal = 2.8;
+          decay = 0.052;
+        } else if (this.materialType === 'ceramic') {
+          baseFreq = isFloor ? 1320 : 1960;
+          clickFreq = 4400;
+          qVal = 7.5;
+          decay = 0.065;
+        } else {
+          baseFreq = isFloor ? 880 : 1280;
+          clickFreq = 3400;
+          qVal = 4.5;
+          decay = 0.044;
+        }
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(baseFreq * pitchJitter * slowMoPitch, now);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.42 * slowMoPitch, now + decay);
+
+        clickOsc.type = 'sine';
+        clickOsc.frequency.setValueAtTime(clickFreq * pitchJitter * slowMoPitch, now);
+        clickOsc.frequency.exponentialRampToValueAtTime(600, now + decay * 0.45);
+
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(baseFreq * 1.35, now);
+        filter.Q.value = qVal;
+
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(gainVal, now + 0.002);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+
+        osc.connect(filter);
+        clickOsc.connect(filter);
+        filter.connect(gain);
+        gain.connect(panner);
+        panner.connect(this.ctx.destination);
+
+        osc.start(now);
+        clickOsc.start(now);
+        osc.stop(now + decay + 0.01);
+        clickOsc.stop(now + decay + 0.01);
+
+        osc.onended = () => {
+          this.activeVoices = Math.max(0, this.activeVoices - 1);
+        };
+      }
+    }
+
+    const foley = new ProceduralFoleyAudio();
+
+    // =========================================================================
+    // 2. THREE.JS SUNLIT ARCHITECTURAL STUDIO SCENE & POST-PROCESSING
+    // =========================================================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#e9dfd1');
+    scene.fog = new THREE.FogExp2('#e9dfd1', 0.013);
+
+    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 120);
+    camera.position.set(10.5, 8.2, 12.2);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.96;
+    container.appendChild(renderer.domElement);
+
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environmentIntensity = 0.48;
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI * 0.485;
+    controls.minDistance = 2.0;
+    controls.maxDistance = 32;
+
+    // Warm Golden-Hour Window Sunlight + Rich Architectural Contrast
+    const hemiLight = new THREE.HemisphereLight('#fff5e6', '#8c7258', 0.55);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight('#ffefd6', 2.05);
+    sunLight.position.set(11, 18, 9);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.camera.near = 2;
+    sunLight.shadow.camera.far = 45;
+    const dShadow = 13.5;
+    sunLight.shadow.camera.left = -dShadow;
+    sunLight.shadow.camera.right = dShadow;
+    sunLight.shadow.camera.top = dShadow;
+    sunLight.shadow.camera.bottom = -dShadow;
+    sunLight.shadow.bias = -0.00035;
+    sunLight.shadow.normalBias = 0.018;
+    scene.add(sunLight);
+
+    const rimLight = new THREE.DirectionalLight('#cbd5e1', 0.42);
+    rimLight.position.set(-12, 9, -10);
+    scene.add(rimLight);
+
+    // High-DPI Multisampled Post-Processing Composer (prevents low-res blur & double tone-mapping washout)
+    const renderTarget = new THREE.WebGLRenderTarget(
+      window.innerWidth * renderer.getPixelRatio(),
+      window.innerHeight * renderer.getPixelRatio(),
+      { samples: 4, type: THREE.HalfFloatType }
+    );
+    const composer = new EffectComposer(renderer, renderTarget);
+    composer.setPixelRatio(renderer.getPixelRatio());
+    composer.setSize(window.innerWidth, window.innerHeight);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.08,
+      0.4,
+      0.92
+    );
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+
+    // =========================================================================
+    // 3. PROCEDURAL PBR OAK FLOOR TEXTURES & ARCHITECTURAL PLINTH MATERIAL
+    // =========================================================================
+    function createOakFloorTextures() {
+      const size = 1024;
+      const diffCanvas = document.createElement('canvas');
+      const roughCanvas = document.createElement('canvas');
+      const bumpCanvas = document.createElement('canvas');
+      diffCanvas.width = roughCanvas.width = bumpCanvas.width = size;
+      diffCanvas.height = roughCanvas.height = bumpCanvas.height = size;
+
+      const dCtx = diffCanvas.getContext('2d');
+      const rCtx = roughCanvas.getContext('2d');
+      const bCtx = bumpCanvas.getContext('2d');
+
+      const plankRows = 8;
+      const plankH = size / plankRows;
+
+      for (let row = 0; row < plankRows; row++) {
+        const y = row * plankH;
+        const offset = (row % 2) * (size * 0.5) + (Math.sin(row * 13.7) * 90);
+        const plankCols = 2;
+        const plankW = size / plankCols;
+
+        for (let col = -1; col <= plankCols; col++) {
+          const x = col * plankW + (offset % plankW);
+          const toneShift = ((row * 7 + col * 13) % 5) * 4 - 8;
+          const r = 186 + toneShift;
+          const g = 154 + toneShift;
+          const b = 122 + toneShift;
+
+          dCtx.fillStyle = `rgb(${r},${g},${b})`;
+          dCtx.fillRect(x, y, plankW, plankH);
+
+          const roughBase = 135 + ((row + col) % 3) * 14;
+          rCtx.fillStyle = `rgb(${roughBase},${roughBase},${roughBase})`;
+          rCtx.fillRect(x, y, plankW, plankH);
+
+          bCtx.fillStyle = 'rgb(140,140,140)';
+          bCtx.fillRect(x, y, plankW, plankH);
+
+          // Subtle organic wood grain streaks
+          for (let gLine = 0; gLine < 26; gLine++) {
+            const gy = y + (gLine / 26) * plankH;
+            dCtx.strokeStyle = `rgba(145, 112, 78, ${0.04 + (gLine % 4) * 0.015})`;
+            dCtx.lineWidth = 1.2;
+            dCtx.beginPath();
+            dCtx.moveTo(x, gy);
+            dCtx.bezierCurveTo(
+              x + plankW * 0.33, gy + Math.sin(gLine + row) * 2.5,
+              x + plankW * 0.66, gy - Math.cos(gLine + col) * 2.5,
+              x + plankW, gy
+            );
+            dCtx.stroke();
+
+            bCtx.strokeStyle = 'rgba(115,115,115,0.22)';
+            bCtx.lineWidth = 1;
+            bCtx.beginPath();
+            bCtx.moveTo(x, gy);
+            bCtx.lineTo(x + plankW, gy);
+            bCtx.stroke();
+          }
+
+          // Plank bevel seams
+          dCtx.strokeStyle = 'rgba(110, 86, 62, 0.38)';
+          dCtx.lineWidth = 2;
+          dCtx.strokeRect(x + 1, y + 1, plankW - 2, plankH - 2);
+
+          bCtx.strokeStyle = 'rgb(60,60,60)';
+          bCtx.lineWidth = 2.5;
+          bCtx.strokeRect(x + 1, y + 1, plankW - 2, plankH - 2);
+        }
+      }
+
+      const wrap = (tex, isSRGB = false) => {
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(9, 9);
+        tex.anisotropy = 8;
+        if (isSRGB) tex.colorSpace = THREE.SRGBColorSpace;
+        return tex;
+      };
+
+      return {
+        map: wrap(new THREE.CanvasTexture(diffCanvas), true),
+        roughnessMap: wrap(new THREE.CanvasTexture(roughCanvas)),
+        bumpMap: wrap(new THREE.CanvasTexture(bumpCanvas))
+      };
+    }
+
+    const oakTextures = createOakFloorTextures();
+    const floorMat = new THREE.MeshStandardMaterial({
+      map: oakTextures.map,
+      roughnessMap: oakTextures.roughnessMap,
+      bumpMap: oakTextures.bumpMap,
+      bumpScale: 0.008,
+      roughness: 0.62,
+      metalness: 0.02
+    });
+
+    const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(75, 75), floorMat);
+    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
+
+    const plinthMat = new THREE.MeshStandardMaterial({
+      color: '#d6c8b6',
+      roughness: 0.55,
+      metalness: 0.05
+    });
+
+    // =========================================================================
+    // 4. CHAMFERED BEVELED DOMINO GEOMETRY & TACTILE PBR PALETTES
+    // =========================================================================
+    const DOMINO_W = 0.44;
+    const DOMINO_H = 0.88;
+    const DOMINO_D = 0.125;   // real-domino proportions (24:48:7 ~ 0.44:0.88:0.125)
+
+    // Collider == visible mesh. (Before: mesh was 0.095 thick but the collider 0.125, so pieces looked like
+    // they stopped 1.5cm short of each other and stacked pieces floated / interpenetrated.)
+    const COLLIDER_W = DOMINO_W;
+    const COLLIDER_H = DOMINO_H;
+    const COLLIDER_D = DOMINO_D;
+
+    function createBeveledDominoGeometry(w, h, d) {
+      const r = 0.032;
+      const bevel = 0.012;
+      const shape = new THREE.Shape();
+      const hw = w * 0.5 - bevel;
+      const hh = h * 0.5 - bevel;
+
+      shape.moveTo(-hw + r, -hh);
+      shape.lineTo(hw - r, -hh);
+      shape.quadraticCurveTo(hw, -hh, hw, -hh + r);
+      shape.lineTo(hw, hh - r);
+      shape.quadraticCurveTo(hw, hh, hw - r, hh);
+      shape.lineTo(-hw + r, hh);
+      shape.quadraticCurveTo(-hw, hh, -hw, hh - r);
+      shape.lineTo(-hw, -hh + r);
+      shape.quadraticCurveTo(-hw, -hh, -hw + r, -hh);
+
+      const geo = new THREE.ExtrudeGeometry(shape, {
+        depth: d - bevel * 2,
+        bevelEnabled: true,
+        bevelThickness: bevel,
+        bevelSize: bevel,
+        bevelSegments: 3,
+        curveSegments: 8
+      });
+      geo.center();
+      geo.computeVertexNormals();
+      return geo;
+    }
+
+    const dominoGeo = createBeveledDominoGeometry(DOMINO_W, DOMINO_H, DOMINO_D);
+
+    let currentMaterialKey = 'resin';
+    const MATERIAL_PALETTES = {
+      resin: [
+        new THREE.MeshPhysicalMaterial({ color: '#f7f3eb', roughness: 0.18, metalness: 0.02, clearcoat: 0.85, clearcoatRoughness: 0.12 }),
+        new THREE.MeshPhysicalMaterial({ color: '#2b2826', roughness: 0.22, metalness: 0.05, clearcoat: 0.85, clearcoatRoughness: 0.14 }),
+        new THREE.MeshPhysicalMaterial({ color: '#d4a359', roughness: 0.26, metalness: 0.65, clearcoat: 0.6, clearcoatRoughness: 0.18 })
+      ],
+      wood: [
+        new THREE.MeshStandardMaterial({ color: '#dfb887', roughness: 0.48, metalness: 0.02 }),
+        new THREE.MeshStandardMaterial({ color: '#6b442a', roughness: 0.52, metalness: 0.02 }),
+        new THREE.MeshStandardMaterial({ color: '#b57c4a', roughness: 0.45, metalness: 0.04 })
+      ],
+      ceramic: [
+        new THREE.MeshPhysicalMaterial({ color: '#8ea399', roughness: 0.68, metalness: 0.0, clearcoat: 0.12 }),
+        new THREE.MeshPhysicalMaterial({ color: '#c77d63', roughness: 0.68, metalness: 0.0, clearcoat: 0.12 }),
+        new THREE.MeshPhysicalMaterial({ color: '#ebe4d8', roughness: 0.62, metalness: 0.0, clearcoat: 0.18 })
+      ]
+    };
+
+    // =========================================================================
+    // 5. CANNON-ES RIGID BODY PHYSICS WORLD (120Hz fixed step, tuned in a headless sim)
+    // =========================================================================
+    // Hard-won facts for domino chains in cannon-es:
+    //  * cannon-es friction is a constant-force clamp (mu * |g| * reducedMass), NOT mu * normalForce.
+    //    A leaning domino presses on its neighbour with ~1N, so even mu = 0.05 between dominoes behaves like
+    //    glue: the falling piece sticks to the next one and the whole chain stalls after 2-3 pieces.
+    //    => domino<->domino friction MUST be 0. Floor friction stays high so the bottom edge hinges, not slides.
+    //  * Sleeping bodies are immovable during the first contact step and (with SAPBroadphase) can be skipped
+    //    entirely, so the falling piece passed straight THROUGH the sleeping one next to it. Nothing sleeps now.
+    //  * NaiveBroadphase is plenty for ~250 bodies and has no sorted-axis edge cases.
+    const FIXED_TIMESTEP = 1 / 120;
+    const MAX_SUBSTEPS_PER_FRAME = 6;   // 6 x 1/120 = 50ms == the frame-time clamp in animate()
+    const world = new CANNON.World();
+    world.gravity.set(0, -19.6, 0);
+    world.broadphase = new CANNON.NaiveBroadphase();
+    world.allowSleep = false;
+    world.solver.iterations = 12;
+    world.solver.tolerance = 0.001;
+
+    const physFloorMat = new CANNON.Material('floor');
+    const physDominoMat = new CANNON.Material('domino');
+    const physStackMat = new CANNON.Material('stack');   // pillars/lintels of the Cathedral wall (frictional so it can stand)
+
+    // High floor grip plants the bottom edge as a clean pivot hinge without sliding
+    world.addContactMaterial(new CANNON.ContactMaterial(physFloorMat, physDominoMat, {
+      friction: 1.0,
+      restitution: 0.0,
+      contactEquationStiffness: 1e7,
+      contactEquationRelaxation: 3,
+      frictionEquationStiffness: 1e7,
+      frictionEquationRelaxation: 3
+    }));
+    world.addContactMaterial(new CANNON.ContactMaterial(physFloorMat, physStackMat, {
+      friction: 1.0, restitution: 0.0, contactEquationStiffness: 1e9, contactEquationRelaxation: 4,
+      frictionEquationStiffness: 1e9, frictionEquationRelaxation: 4
+    }));
+    world.addContactMaterial(new CANNON.ContactMaterial(physStackMat, physStackMat, {
+      friction: 0.6, restitution: 0.0, contactEquationStiffness: 1e9, contactEquationRelaxation: 4,
+      frictionEquationStiffness: 1e9, frictionEquationRelaxation: 4
+    }));
+    world.addContactMaterial(new CANNON.ContactMaterial(physStackMat, physDominoMat, {
+      friction: 0.0, restitution: 0.0, contactEquationStiffness: 1e7, contactEquationRelaxation: 3,
+      frictionEquationStiffness: 1e7, frictionEquationRelaxation: 3
+    }));
+    // Frictionless face contact: the falling piece transfers its momentum through the contact normal only
+    world.addContactMaterial(new CANNON.ContactMaterial(physDominoMat, physDominoMat, {
+      friction: 0.0,
+      restitution: 0.0,
+      contactEquationStiffness: 1e7,
+      contactEquationRelaxation: 3,
+      frictionEquationStiffness: 1e7,
+      frictionEquationRelaxation: 3
+    }));
+
+    // Static Floor Body
+    const floorBody = new CANNON.Body({
+      mass: 0,
+      material: physFloorMat,
+      shape: new CANNON.Plane()
+    });
+    floorBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+    world.addBody(floorBody);
+
+    // =========================================================================
+    // 6. DOMINO & ARCHITECTURAL BUILD GENERATOR
+    // =========================================================================
+    let dominoes = [];
+    let staticProps = [];
+    let starterDomino = null;
+    let currentBuildIndex = 0;
+    let isToppling = false;
+    let fallenCount = 0;
+
+    // Subtle Golden Ring Indicator Around the Starter Domino
+    const starterRingGeo = new THREE.RingGeometry(0.32, 0.39, 32);
+    starterRingGeo.rotateX(-Math.PI / 2);
+    const starterRingMat = new THREE.MeshBasicMaterial({
+      color: '#fbbf24',
+      transparent: true,
+      opacity: 0.75,
+      side: THREE.DoubleSide
+    });
+    const starterRing = new THREE.Mesh(starterRingGeo, starterRingMat);
+    starterRing.position.y = 0.008;
+    scene.add(starterRing);
+
+    // Subtle Hover Ring Indicator for Interactive Mid-Line Tapping
+    const hoverRingGeo = new THREE.RingGeometry(0.28, 0.34, 32);
+    hoverRingGeo.rotateX(-Math.PI / 2);
+    const hoverRingMat = new THREE.MeshBasicMaterial({
+      color: '#fde68a',
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide
+    });
+    const hoverRing = new THREE.Mesh(hoverRingGeo, hoverRingMat);
+    hoverRing.position.y = 0.009;
+    hoverRing.visible = false;
+    scene.add(hoverRing);
+
+    function clearWorld() {
+      for (const d of dominoes) {
+        scene.remove(d.mesh);
+        if (d.inWorld) world.removeBody(d.body);
+      }
+      for (const p of staticProps) {
+        scene.remove(p.mesh);
+        if (p.body) world.removeBody(p.body);
+      }
+      dominoes = [];
+      staticProps = [];
+      starterDomino = null;
+      isToppling = false;
+      fallenCount = 0;
+      physAccumulator = 0;
+      hoverRing.visible = false;
+      updateStatsUI();
+    }
+
+    function addPlinth(x, y, z, w, h, d) {
+      const geo = new THREE.BoxGeometry(w, h, d);
+      const mesh = new THREE.Mesh(geo, plinthMat);
+      mesh.position.set(x, y + h * 0.5, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+
+      const body = new CANNON.Body({
+        mass: 0,
+        material: physFloorMat,
+        shape: new CANNON.Box(new CANNON.Vec3(w * 0.5, h * 0.5, d * 0.5))
+      });
+      body.position.set(x, y + h * 0.5, z);
+      world.addBody(body);
+
+      staticProps.push({ mesh, body });
+    }
+
+    // ---- Active-set simulation ------------------------------------------------------------------
+    // Simulating every piece at once costs 3-4ms per physics step on a 200-piece board. Instead, pieces only
+    // live in the physics world while they're near motion: dormant pieces are woken (added to the world) as soon
+    // as a moving piece comes within `wakeRadius`, and fallen pieces that have settled are retired (removed).
+    // Unlike cannon's own sleeping, a woken piece is a normal awake body *before* anything touches it, so the
+    // first impact transfers real momentum (a sleeping body acts as an immovable wall for the first step).
+    let wakeRadius = 1.8;
+    let retireEnabled = true;
+    const _up = new CANNON.Vec3(0, 1, 0);
+    const _tmp = new CANNON.Vec3();
+
+    function enterWorld(d) {
+      if (d.inWorld) return;
+      world.addBody(d.body);
+      d.inWorld = true;
+      d.retired = false;
+      d.calm = 0;
+      // Standing structures (the Cathedral wall) are one rigid-ish assembly: a tall stack of 0.125 m-thick pillars
+      // is a delicate inverted pendulum, so it must not be simulated until the fuse is about to reach it.
+      // When any piece of it wakes, all of it wakes together.
+      if (d.body.material === physStackMat) {
+        for (const o of dominoes) if (o !== d && !o.inWorld && o.body.material === physStackMat) enterWorld(o);
+      }
+    }
+    function leaveWorld(d) {
+      if (!d.inWorld) return;
+      world.removeBody(d.body);
+      d.body.velocity.set(0, 0, 0);
+      d.body.angularVelocity.set(0, 0, 0);
+      d.inWorld = false;
+      d.retired = true;
+    }
+    function computeNeighbors(radius) {
+      const r2 = radius * radius;
+      for (const a of dominoes) {
+        a.neighbors = [];
+        const pa = a.body.position;
+        for (const b of dominoes) {
+          if (a === b) continue;
+          const pb = b.body.position;
+          const dx = pa.x - pb.x, dy = pa.y - pb.y, dz = pa.z - pb.z;
+          if (dx * dx + dy * dy + dz * dz <= r2) a.neighbors.push(b);
+        }
+      }
+    }
+    function updateActiveSet(dt) {
+      for (const d of dominoes) {
+        if (!d.inWorld) continue;
+        const b = d.body;
+        b.quaternion.vmult(_up, _tmp);
+        d.upY = _tmp.y;
+        if (!d.isLintel && d.upY < 0.58 && !d.fallen) {
+          d.fallen = true;
+          // Frictionless faces mean a fallen pile would keep creeping; a little extra drag lets it settle
+          b.linearDamping = 0.7;
+          b.angularDamping = 0.9;
+        }
+        const e = b.velocity.lengthSquared() + b.angularVelocity.lengthSquared();
+        d.e = e;
+        d.calm = e < 0.01 ? d.calm + dt : 0;
+        if (e > 0.04) {
+          for (const n of d.neighbors) if (!n.inWorld && !n.retired) enterWorld(n);
+        }
+      }
+      if (!retireEnabled) return;
+      for (const d of dominoes) {
+        if (!d.inWorld || !d.fallen || d.calm < 0.8) continue;
+        let busy = false;
+        for (const n of d.neighbors) { if (n.inWorld && n.e > 0.3) { busy = true; break; } }
+        if (!busy) leaveWorld(d);
+      }
+    }
+
+    // Fixed-step loop WITHOUT cannon's "break after one slow step and discard the backlog" behaviour
+    // (which silently turned the sim into slow motion on busy boards).
+    let physAccumulator = 0;
+    function stepPhysics(dt) {
+      updateActiveSet(dt);
+      physAccumulator += dt;
+      let n = 0;
+      while (physAccumulator >= FIXED_TIMESTEP && n < MAX_SUBSTEPS_PER_FRAME) {
+        world.step(FIXED_TIMESTEP);
+        physAccumulator -= FIXED_TIMESTEP;
+        n++;
+      }
+      if (physAccumulator >= FIXED_TIMESTEP) physAccumulator = 0; // drop backlog instead of spiralling
+    }
+
+    const TIP_OMEGA = 2.4; // rad/s given to the piece the user starts / taps
+
+    function addDomino(x, y, z, rotY, colorSlot = 0, isStarter = false, scale = 1.0, stack = false) {
+      const palette = MATERIAL_PALETTES[currentMaterialKey];
+      const mat = palette[colorSlot % palette.length];
+
+      const mesh = new THREE.Mesh(dominoGeo, mat);
+      mesh.scale.set(scale, scale, scale);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.position.set(x, y + (DOMINO_H * scale) * 0.5, z);
+      mesh.rotation.y = rotY;
+      scene.add(mesh);
+
+      const shape = new CANNON.Box(new CANNON.Vec3(
+        (COLLIDER_W * scale) * 0.5,
+        (COLLIDER_H * scale) * 0.5,
+        (COLLIDER_D * scale) * 0.5
+      ));
+
+      const dynamicMass = 0.55 * scale * scale;
+      const body = new CANNON.Body({
+        mass: dynamicMass,
+        type: CANNON.Body.DYNAMIC,
+        material: stack ? physStackMat : physDominoMat,
+        shape,
+        linearDamping: 0.01,
+        angularDamping: 0.03,
+        allowSleep: false
+      });
+
+      body.position.set(x, y + (DOMINO_H * scale) * 0.5, z);
+      body.quaternion.setFromEuler(0, rotY, 0);
+      // NOT added to the world yet: pieces join the simulation just ahead of the wave (see active-set below)
+
+      const forwardDir = new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY)).normalize();
+
+      const record = {
+        mesh,
+        body,
+        dynamicMass,
+        activated: false,
+        activatedAt: 0,
+        colorSlot,
+        scale,
+        fallen: false,
+        isStarter,
+        isLintel: false,
+        forwardDir,
+        inWorld: false,
+        retired: false,
+        calm: 0,
+        e: 0,
+        upY: 1,
+        neighbors: []
+      };
+
+      // Tip the piece over its front-bottom edge. The body is given the velocity of a rigid rotation about that
+      // edge (v = w x r). Spinning it about its centre instead gets mostly absorbed by the floor contact, so
+      // the starter used to hop and settle at ~20 degrees without ever reaching the next piece.
+      record.tip = (dirX, dirZ, omega = TIP_OMEGA) => {
+        const len = Math.hypot(dirX, dirZ);
+        if (len < 1e-6) return;
+        const nx = dirX / len, nz = dirZ / len;
+        if (!record.activated) {
+          record.activated = true;
+          record.activatedAt = performance.now();
+        }
+        enterWorld(record);
+        const w = new CANNON.Vec3(nz * omega, 0, -nx * omega);
+        const r = new CANNON.Vec3(-nx * DOMINO_D * scale * 0.5, DOMINO_H * scale * 0.5, -nz * DOMINO_D * scale * 0.5);
+        body.angularVelocity.copy(w);
+        w.cross(r, body.velocity);
+      };
+
+      // Contacts only drive audio now. Chain propagation is pure physics (no scripted kicks).
+      body.addEventListener('collide', (e) => {
+        const isFloor = e.body === floorBody;
+        const relVel = Math.abs(e.contact.getImpactVelocityAlongNormal());
+        if (relVel > 0.55) foley.playImpact(relVel, body.position.x, isFloor);
+      });
+
+      dominoes.push(record);
+
+      if (isStarter) {
+        starterDomino = record;
+        starterRing.position.set(x, y + 0.008, z);
+        starterRing.visible = true;
+      }
+      return record;
+    }
+
+    // Helper: Place dominoes cleanly spaced along an array of 3D points (0.38m natural spacing)
+    function placeDominoChain(points, spacing = 0.38, colorPatternFn = (i) => i % 2, markFirstStarter = false) {
+      if (points.length < 2) return [];
+      const curve = new THREE.CatmullRomCurve3(points);
+      const totalLen = curve.getLength();
+      const count = Math.max(2, Math.floor(totalLen / spacing));
+      const created = [];
+
+      for (let i = 0; i <= count; i++) {
+        const u = i / count;
+        const pos = curve.getPointAt(u);
+        const tangent = curve.getTangentAt(u);
+        const rotY = Math.atan2(tangent.x, tangent.z);
+        const isStarter = markFirstStarter && i === 0;
+        const rec = addDomino(pos.x, pos.y, pos.z, rotY, colorPatternFn(i), isStarter);
+        created.push(rec);
+      }
+      return created;
+    }
+
+    // =========================================================================
+    // LAYOUT HELPERS
+    // Headings: forward = (sin h, cos h), left = (cos h, -sin h). A positive turn steers LEFT.
+    //
+    // Why these exist: a domino only topples what is physically in front of its broad face. Every junction in the
+    // old boards (ring -> spoke, hub -> starburst ray, fan, wall) either spawned pieces overlapping each other
+    // (explosions the moment they woke) or put the next piece where the falling one could never reach it, so the
+    // chain silently died. All junctions below are built from two patterns that were verified in the headless sim:
+    //   * Y-split   : the last trunk piece falls onto TWO children placed +/-0.27m either side of its centreline.
+    //   * ring peel : a ring piece is replaced by two pieces (ring continues on one side, a branch starts on the
+    //                 other) so a tangentially-falling ring piece hits both.
+    // =========================================================================
+    const PITCH = 0.38;
+    const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+
+    // Hand-steered run: n pieces PITCH apart; heading swings by `turn` (rad, + = left) across the first
+    // `turnPieces` pieces then holds. Returns the records and the pose where the NEXT piece would sit.
+    function steerChain(x, z, h, n, turn = 0, colorFn = (i) => i % 2, o = {}) {
+      const tp = Math.max(2, o.turnPieces ?? n);
+      const recs = [];
+      for (let i = 0; i < n; i++) {
+        const k = Math.min(1, i / (tp - 1));
+        const kMid = Math.min(1, (i + 0.5) / (tp - 1));
+        recs.push(addDomino(x, o.y ?? 0, z, h + turn * k, colorFn(i), !!o.starter && i === 0));
+        x += Math.sin(h + turn * kMid) * PITCH;
+        z += Math.cos(h + turn * kMid) * PITCH;
+      }
+      return { recs, next: { x, z, h: h + turn } };
+    }
+
+    // Y-split: two start poses straddling the centreline of pose p (where the next piece would go).
+    function splitPose(p, off = 0.27, spread = 0.12) {
+      const lx = Math.cos(p.h), lz = -Math.sin(p.h);
+      return [
+        { x: p.x + lx * off, z: p.z + lz * off, h: p.h + spread },  // left
+        { x: p.x - lx * off, z: p.z - lz * off, h: p.h - spread }   // right
+      ];
+    }
+
+    // Slot poses around a circle (centre cx,cz, radius R) starting at polar angle a0.
+    function ringPoses(cx, cz, R, a0, n, cw = false) {
+      const out = [];
+      const da = (PITCH / R) * (cw ? -1 : 1);
+      for (let i = 0; i < n; i++) {
+        const a = a0 + i * da;
+        const dx = cw ? Math.sin(a) : -Math.sin(a);
+        const dz = cw ? -Math.cos(a) : Math.cos(a);
+        out.push({ x: cx + Math.cos(a) * R, z: cz + Math.sin(a) * R, h: Math.atan2(dx, dz) });
+      }
+      return out;
+    }
+
+    // Lay slot poses as a chain. Slots listed in `nodes` become ring peels: {inward: true|false, branch(pose, side)}.
+    // The side the branch leaves on (+1 = left of travel, -1 = right) is derived from the ring centre, so it stays
+    // right whichever way round the ring runs.
+    function layPoses(poses, colorFn, nodes = {}, o = {}) {
+      const recs = [];
+      const [cx, cz] = o.center ?? [0, 0];
+      poses.forEach((p, i) => {
+        const node = nodes[i];
+        if (!node) {
+          recs.push(addDomino(p.x, 0, p.z, p.h, colorFn(i), !!o.starter && i === 0));
+          return;
+        }
+        const lx = Math.cos(p.h), lz = -Math.sin(p.h);
+        const centreOnLeft = (cx - p.x) * lx + (cz - p.z) * lz > 0 ? 1 : -1;
+        const s = node.inward ? centreOnLeft : -centreOnLeft;
+        const off = node.off ?? 0.27;
+        recs.push(addDomino(p.x - s * lx * off, 0, p.z - s * lz * off, p.h, colorFn(i)));
+        node.branch({ x: p.x + s * lx * off, z: p.z + s * lz * off, h: p.h }, s);
+      });
+      return recs;
+    }
+
+    // Heading that points from (x,z) toward / away from the point (cx,cz)
+    function radialHeading(x, z, cx, cz, inward) {
+      const dx = inward ? cx - x : x - cx, dz = inward ? cz - z : z - cz;
+      return Math.atan2(dx, dz);
+    }
+    // A branch leaving a ring at pose p on side s, swinging onto a radial line, n pieces long.
+    function radialBranch(p, s, cx, cz, inward, n, colorFn, kick = 0.3, turnPieces = 3) {
+      const h0 = p.h + s * kick;
+      const hT = radialHeading(p.x, p.z, cx, cz, inward);
+      return steerChain(p.x, p.z, h0, n, wrapAngle(hT - h0), colorFn, { turnPieces });
+    }
+
+    // Standing pillars / flat lintels for the Cathedral wall use a frictional "stack" material so structures can
+    // actually stand (domino<->domino faces are frictionless, which is what lets chains run).
+    const LINTEL_LEN = 0.80, LINTEL_DEPTH = 0.55;
+    function addLintel(x, yUnder, z) {
+      const palette = MATERIAL_PALETTES[currentMaterialKey];
+      const mesh = new THREE.Mesh(dominoGeo, palette[2]);
+      mesh.scale.set(LINTEL_DEPTH / DOMINO_W, LINTEL_LEN / DOMINO_H, 1);
+      mesh.rotation.set(Math.PI * 0.5, 0, Math.PI * 0.5);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      const cy = yUnder + DOMINO_D * 0.5;
+      mesh.position.set(x, cy, z);
+      scene.add(mesh);
+
+      const body = new CANNON.Body({
+        mass: 0.4,
+        type: CANNON.Body.DYNAMIC,
+        material: physStackMat,
+        shape: new CANNON.Box(new CANNON.Vec3(LINTEL_DEPTH * 0.5, LINTEL_LEN * 0.5, DOMINO_D * 0.5)),
+        linearDamping: 0.02,
+        angularDamping: 0.05,
+        allowSleep: false
+      });
+      body.position.set(x, cy, z);
+      body.quaternion.setFromEuler(Math.PI * 0.5, 0, Math.PI * 0.5);
+
+      const record = {
+        mesh, body, dynamicMass: 0.4, activated: false, activatedAt: 0, colorSlot: 2, scale: 1,
+        fallen: false, isStarter: false, isLintel: true, forwardDir: new THREE.Vector3(0, 0, 1),
+        inWorld: false, retired: false, calm: 0, e: 0, upY: 1, neighbors: []
+      };
+      body.addEventListener('collide', (e) => {
+        const relVel = Math.abs(e.contact.getImpactVelocityAlongNormal());
+        if (relVel > 0.55) foley.playImpact(relVel, body.position.x, e.body === floorBody);
+      });
+      dominoes.push(record);
+      return record;
+    }
+
+    // =========================================================================
+    // 7. CURATED ARCHITECTURAL BUILD LIBRARY (4 STRUCTURES)
+    // =========================================================================
+    const BUILDS = [
+      {
+        title: '01 · The Grand Helix & Starburst',
+        camPos: new THREE.Vector3(10.5, 8.2, 12.2),
+        camTarget: new THREE.Vector3(0, 0.8, 0),
+        build() {
+          // Sweeping approach into an inward Archimedean spiral (spline, 0.38m pitch) ...
+          const RING_R = 2.9, TURNS = 1.8, START_R = 5.5;
+          const pts = [];
+          const leadSteps = 22;
+          for (let i = 0; i < leadSteps; i++) {
+            const t = i / leadSteps;
+            pts.push(new THREE.Vector3(-8.4 + t * 4.6, 0, 5.6 - Math.sin(t * Math.PI) * 1.5 - t * 2.2));
+          }
+          const spiralSteps = 160;
+          const startAngle = Math.atan2(3.4, -3.8);
+          for (let i = 0; i <= spiralSteps; i++) {
+            const t = i / spiralSteps;
+            const angle = startAngle - t * TURNS * Math.PI * 2;
+            const r = START_R * (1 - t) + RING_R * t;
+            pts.push(new THREE.Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r));
+          }
+          const spiral = placeDominoChain(pts, PITCH, (i) => (i % 10 === 0 ? 2 : i % 2), true);
+
+          // ... which rolls straight into a ring. Seven rays peel inward off the ring (the starburst).
+          const lp = spiral[spiral.length - 1].body.position;
+          const a0 = Math.atan2(lp.z, lp.x), R = Math.hypot(lp.x, lp.z);
+          const N = 30;     // ring stops short of a full turn so it never runs into the spiral's last loop
+          const poses = ringPoses(0, 0, R, a0, N + 1, true).slice(1);
+          const nodes = {};
+          for (let k = 3; k < N - 5; k += 4) {
+            nodes[k] = {
+              inward: true,
+              branch: (p, s) => radialBranch(p, s, 0, 0, true, 5, (j) => (j === 0 ? 2 : 1), 0.3, 3)
+            };
+          }
+          layPoses(poses, (i) => (i % 5 === 4 ? 2 : i % 2), nodes, { center: [0, 0] });
+        }
+      },
+      {
+        title: '02 · The Viaduct & Stepped Cascade',
+        camPos: new THREE.Vector3(9.8, 7.6, 11.4),
+        camTarget: new THREE.Vector3(0, 1.3, 0),
+        build() {
+          // Architectural Grand Staircase Ascending to an Elevated Bridge and Cascading Down
+          const stepCount = 4;
+          const stepH = 0.21;
+          const stepRun = 0.78;
+          const baseZ = -1.5;
+
+          // Ascending Steps
+          for (let s = 0; s < stepCount; s++) {
+            const h = (s + 1) * stepH;
+            const x = -4.3 + s * stepRun;
+            addPlinth(x, 0, baseZ, stepRun, h, 1.5);
+          }
+
+          // Elevated Central Viaduct Span
+          const topH = stepCount * stepH;
+          const bridgeW = 3.1;
+          addPlinth(0, 0, baseZ, bridgeW, topH, 1.5);
+
+          // Descending Steps
+          for (let s = 0; s < stepCount; s++) {
+            const h = (stepCount - s) * stepH;
+            const x = 1.94 + s * stepRun;
+            addPlinth(x, 0, baseZ, stepRun, h, 1.5);
+          }
+
+          // Ground approach lead-in (0.38m pitch right up to first step edge)
+          for (let i = 0; i < 8; i++) {
+            const x = -7.52 + i * 0.38;
+            addDomino(x, 0, baseZ, Math.PI * 0.5, i % 2, i === 0);
+          }
+
+          // Dominoes climbing each ascending step (2 per step at 0.39m pitch so top edge cleanly strikes next step)
+          for (let s = 0; s < stepCount; s++) {
+            const y = (s + 1) * stepH;
+            const xStart = -4.3 + s * stepRun - 0.19;
+            addDomino(xStart, y, baseZ, Math.PI * 0.5, 0);
+            addDomino(xStart + 0.39, y, baseZ, Math.PI * 0.5, 2);
+          }
+
+          // Dominoes crossing the Viaduct Bridge (0.38m pitch)
+          for (let i = 0; i < 8; i++) {
+            const x = -1.35 + i * 0.38;
+            addDomino(x, topH, baseZ, Math.PI * 0.5, i % 2);
+          }
+
+          // Dominoes cascading down the descending steps
+          for (let s = 0; s < stepCount; s++) {
+            const y = (stepCount - s) * stepH;
+            const xStart = 1.94 + s * stepRun - 0.19;
+            addDomino(xStart, y, baseZ, Math.PI * 0.5, 2);
+            addDomino(xStart + 0.39, y, baseZ, Math.PI * 0.5, 1);
+          }
+
+          // Two ground pieces bridge the last step to the return curve (it used to leave a ~1m dead gap)
+          addDomino(4.86, 0, baseZ, Math.PI * 0.5, 0);
+          addDomino(5.24, 0, baseZ, Math.PI * 0.5, 2);
+
+          // Sweeping ground return (right-hand arc, R~2.65) ...
+          const arc = steerChain(5.62, baseZ, Math.PI * 0.5, 26, -Math.PI * 1.15, (i) => i % 2);
+
+          // ... into a four-ray finale fan: Y-split, each arm curves outward, then splits again
+          const [aL, aR] = splitPose(arc.next, 0.27, 0.10);
+          const armL = steerChain(aL.x, aL.z, aL.h, 4, +0.55, (i) => (i + 1) % 3);
+          const armR = steerChain(aR.x, aR.z, aR.h, 4, -0.55, (i) => (i + 1) % 3);
+          for (const arm of [armL, armR]) {
+            const [bL, bR] = splitPose(arm.next, 0.27, 0.10);
+            steerChain(bL.x, bL.z, bL.h, 7, +0.10, (k) => (k + 1) % 3);
+            steerChain(bR.x, bR.z, bR.h, 7, -0.10, (k) => (k + 1) % 3);
+          }
+        }
+      },
+      {
+        title: '03 · The Kinetic Mandala',
+        camPos: new THREE.Vector3(0.5, 12.2, 9.8),
+        camTarget: new THREE.Vector3(0, 0.4, 0),
+        build() {
+          // Entry fuse runs tangentially into the outer ring (a radial entry only hits the first ring piece on its
+          // thin edge, which cannot tip it along the ring).
+          const OUTER_R = 3.6, INNER_R = 1.3;
+          const FUSE_N = 20;
+          // ring starts at the bottom (angle -90deg) travelling +x (counter-clockwise)
+          const a0 = -Math.PI * 0.5;
+          const ringStartX = 0, ringStartZ = -OUTER_R;
+          steerChain(ringStartX - FUSE_N * PITCH, ringStartZ, Math.PI * 0.5, FUSE_N,
+            0, (i) => (i % 3 === 0 ? 2 : 0), { starter: true });
+
+          const N = 54;                                    // ~324 degrees; the gap is where the fuse comes in
+          const poses = ringPoses(0, 0, OUTER_R, a0, N, false);
+          const nodes = {};
+          // 11 inward spokes (CCW ring: centre is on the LEFT = +1) and 5 outward petals between them
+          for (let k = 3; k < N - 1; k += 5) {
+            nodes[k] = {
+              inward: true,
+              branch: (p, s) => radialBranch(p, s, 0, 0, true, 4, (j) => (j === 0 ? 2 : (k % 2)), 0.3, 2)
+            };
+          }
+          for (let k = 10; k < N - 3; k += 10) {
+            nodes[k] = {
+              inward: false,
+              branch: (p, s) => {
+                // petal: out along the radius, then a 300-degree loop
+                const out = radialBranch(p, s, 0, 0, false, 3, (j) => (j % 2 ? 2 : 1), 0.3, 2);
+                steerChain(out.next.x, out.next.z, out.next.h, 12, +Math.PI * 1.4, (j) => (j % 2 ? 2 : 1), { turnPieces: 12 });
+              }
+            };
+          }
+          // one spoke becomes the feed arm of the inner sacred ring: it curls tangentially into it
+          const armSlot = 23;
+          nodes[armSlot] = {
+            inward: true,
+            branch: (p, s) => {
+              const h0 = radialHeading(p.x, p.z, 0, 0, true);
+              const straight = steerChain(p.x, p.z, h0, 3, 0, () => 2);
+              const curl = steerChain(straight.next.x, straight.next.z, straight.next.h, 4, +Math.PI * 0.5, () => 2, { turnPieces: 4 });
+              const e = curl.next;
+              const ia = Math.atan2(e.z, e.x), ir = Math.hypot(e.x, e.z);
+              const inner = ringPoses(0, 0, ir, ia, 17, false);
+              layPoses(inner, () => 2, {}, { center: [0, 0] });
+            }
+          };
+          layPoses(poses, (i) => i % 2, nodes, { center: [0, 0] });
+        }
+      },
+      {
+        title: '04 · The Cathedral Monument Wall',
+        camPos: new THREE.Vector3(8.5, 6.2, 10.2),
+        camTarget: new THREE.Vector3(0, 1.8, 0),
+        wakeRadius: 1.0,   // the wall stays out of the simulation (perfectly still) until the fuse is ~1 m away, then wakes as one
+        retire: false,
+        build() {
+          // Ground-level fuse: runs down -z, then Y-splits toward the two outer columns of the wall
+          const lead = steerChain(0, 7.0, Math.PI, 7, 0, (i) => (i === 0 ? 2 : 0), { starter: true });
+          const [L, R] = splitPose(lead.next, 0.27, 0.10);
+          const bl = [
+            new THREE.Vector3(L.x, 0, L.z),
+            new THREE.Vector3(-1.85, 0, 3.1),
+            new THREE.Vector3(-2.52, 0, 1.6),
+            new THREE.Vector3(-2.52, 0, 0.42)
+          ];
+          const br = [
+            new THREE.Vector3(R.x, 0, R.z),
+            new THREE.Vector3(1.85, 0, 3.1),
+            new THREE.Vector3(2.52, 0, 1.6),
+            new THREE.Vector3(2.52, 0, 0.42)
+          ];
+          placeDominoChain(bl, PITCH, (i) => i % 2, false);
+          placeDominoChain(br, PITCH, (i) => i % 2, false);
+
+          // Multi-tier wall: pillars (stood on end) carrying flat lintels, which carry the next tier
+          const tiers = 5, cols = 7, colSpacing = 0.84;
+          const levelHeight = DOMINO_H + DOMINO_D + 0.002;
+          for (let tier = 0; tier < tiers; tier++) {
+            const baseY = tier * levelHeight;
+            const currentCols = cols - Math.floor(tier * 0.5);
+            const startX = -((currentCols - 1) * colSpacing) * 0.5;
+            for (let c = 0; c < currentCols; c++) {
+              addDomino(startX + c * colSpacing, baseY, 0, 0, (tier + c) % 2, false, 1.0, true);
+            }
+            for (let c = 0; c < currentCols - 1; c++) {
+              addLintel(startX + (c + 0.5) * colSpacing, baseY + DOMINO_H + 0.001, 0);
+            }
+          }
+        }
+      }
+    ];
+
+    // =========================================================================
+    // 8. CAMERA DIRECTOR, RAYCAST INTERACTION & TELEMETRY
+    // =========================================================================
+    let cameraMode = 'wave'; // 'wave' | 'macro' | 'overhead' | 'orbit'
+    let timeScale = 1.0;
+    let isUserDragging = false;
+    const smoothCamPos = new THREE.Vector3();
+    const smoothCamTarget = new THREE.Vector3();
+    const lastActiveWavePos = new THREE.Vector3();
+    const lastActiveWaveDir = new THREE.Vector3(1, 0, 0);
+
+    controls.addEventListener('start', () => {
+      isUserDragging = true;
+    });
+    controls.addEventListener('end', () => {
+      isUserDragging = false;
+    });
+
+    function loadBuild(index) {
+      currentBuildIndex = index;
+      clearWorld();
+      const buildDef = BUILDS[index];
+      document.getElementById('build-subtitle').textContent = buildDef.title;
+
+      buildDef.build();
+      wakeRadius = buildDef.wakeRadius ?? 1.8;
+      retireEnabled = buildDef.retire !== false;
+      computeNeighbors(wakeRadius);
+      document.getElementById('stat-total').textContent = dominoes.length;
+      updateStatsUI();
+
+      // Initialize camera smoothly toward build vantage point
+      smoothCamPos.copy(buildDef.camPos);
+      smoothCamTarget.copy(buildDef.camTarget);
+      if (starterDomino) {
+        lastActiveWavePos.set(
+          starterDomino.body.position.x,
+          starterDomino.body.position.y,
+          starterDomino.body.position.z
+        );
+        lastActiveWaveDir.copy(starterDomino.forwardDir);
+      } else {
+        lastActiveWavePos.copy(buildDef.camTarget);
+      }
+      if (cameraMode === 'orbit') {
+        camera.position.copy(buildDef.camPos);
+        controls.target.copy(buildDef.camTarget);
+      }
+    }
+
+    function applyCalibratedToppleImpulse(target, customDirection = null) {
+      if (!target) return;
+      isToppling = true;
+
+      const tx = target.body.position.x;
+      const ty = target.body.position.y;
+      const tz = target.body.position.z;
+
+      // Determine forward tangent unit vector in XZ plane
+      const dir = new THREE.Vector3();
+      if (customDirection && customDirection.lengthSq() > 1e-6) {
+        dir.copy(customDirection).setY(0).normalize();
+      } else if (target.forwardDir && target.forwardDir.lengthSq() > 1e-6) {
+        dir.copy(target.forwardDir).setY(0).normalize();
+      } else {
+        const localFwd = new CANNON.Vec3(0, 0, 1);
+        target.body.quaternion.vmult(localFwd, localFwd);
+        dir.set(localFwd.x, 0, localFwd.z).normalize();
+      }
+
+      // Lock Wave Tracker initial focus onto the triggered domino so camera never snaps away or fights
+      lastActiveWavePos.set(tx, ty, tz);
+      lastActiveWaveDir.copy(dir);
+
+      // Tip the piece over its front-bottom edge toward `dir`; everything after that is physics.
+      if (target.tip) {
+        target.tip(dir.x, dir.z, TIP_OMEGA);
+      }
+
+      foley.playImpact(2.2, target.body.position.x, false);
+    }
+
+    function triggerStarterDomino() {
+      foley.init();
+      // If starter hasn't been tipped yet, tip it; otherwise find the next standing domino at the frontier so the button always works
+      let target = starterDomino && !starterDomino.activated
+        ? starterDomino
+        : dominoes.find(d => !d.activated && !d.fallen && !d.isLintel);
+      if (!target) return;
+
+      if (target === starterDomino) starterRing.visible = false;
+      hoverRing.visible = false;
+      applyCalibratedToppleImpulse(target);
+
+      // Hide hint toast once user interacts
+      const toast = document.getElementById('hint-toast');
+      if (toast) toast.style.opacity = '0';
+    }
+
+    function updateStatsUI() {
+      document.getElementById('stat-fallen').textContent = fallenCount;
+      const total = Math.max(1, dominoes.length);
+      const pct = Math.min(1, fallenCount / total);
+      const circumference = 87.96;
+      document.getElementById('progress-ring').style.strokeDashoffset = circumference * (1 - pct);
+    }
+
+    // Track Active Falling Wavefront for Cinematography (filtered strictly to newly tipping wave edge to eliminate camera bounce)
+    const waveCentroid = new THREE.Vector3();
+    const waveDirection = new THREE.Vector3();
+    const upVec = new CANNON.Vec3(0, 1, 0);
+    const tmpVec = new CANNON.Vec3();
+
+    function updateDominoStatesAndWave() {
+      let currentFallen = 0;
+      let activeCount = 0;
+      const nowMs = performance.now();
+      waveCentroid.set(0, 0, 0);
+      waveDirection.set(0, 0, 0);
+
+      for (let i = 0; i < dominoes.length; i++) {
+        const d = dominoes[i];
+        if (d.inWorld) {
+          d.mesh.position.copy(d.body.position);
+          d.mesh.quaternion.copy(d.body.quaternion);
+        }
+        const tiltCos = d.upY; // 1.0 = standing upright, 0.0 = flat on floor (computed in updateActiveSet)
+
+        if (!d.activated && (tiltCos < 0.995 || d.body.velocity.lengthSquared() > 0.05)) {
+          d.activated = true;
+          d.activatedAt = nowMs;
+        }
+
+        if (!d.isLintel && tiltCos < 0.58) {
+          if (!d.fallen) d.fallen = true;
+        }
+        if (d.fallen) currentFallen++;
+
+        // Only track the fresh leading wave edge (activated within last 650ms & mid-tip) so old jitter never bounces the camera
+        const ageMs = nowMs - d.activatedAt;
+        if (d.activated && !d.isLintel && ageMs < 650 && tiltCos < 0.97 && tiltCos > 0.35) {
+          waveCentroid.x += d.body.position.x;
+          waveCentroid.y += d.body.position.y;
+          waveCentroid.z += d.body.position.z;
+
+          waveDirection.x += d.body.velocity.x;
+          waveDirection.z += d.body.velocity.z;
+          activeCount++;
+        }
+      }
+
+      if (currentFallen !== fallenCount) {
+        fallenCount = currentFallen;
+        updateStatsUI();
+      }
+
+      if (activeCount > 0) {
+        waveCentroid.divideScalar(activeCount);
+        // Reject sudden multi-branch jumps (> 3.5m away) so camera glides smoothly without snapping
+        if (lastActiveWavePos.distanceTo(waveCentroid) < 3.5) {
+          lastActiveWavePos.lerp(waveCentroid, 0.08);
+        } else {
+          lastActiveWavePos.lerp(waveCentroid, 0.025);
+        }
+        if (waveDirection.lengthSq() > 0.001) {
+          waveDirection.normalize();
+          lastActiveWaveDir.lerp(waveDirection, 0.08).normalize();
+        }
+      }
+
+      return { activeCount };
+    }
+
+    function updateCameraDirector(dt, waveInfo) {
+      if (cameraMode === 'orbit') {
+        controls.update();
+        return;
+      }
+
+      const buildDef = BUILDS[currentBuildIndex];
+      const desiredTarget = new THREE.Vector3();
+      const desiredPos = new THREE.Vector3();
+
+      if (cameraMode === 'overhead') {
+        desiredTarget.set(0, 0.2, 0);
+        desiredPos.set(0.01, 16.5, 2.2);
+      } else if (cameraMode === 'macro') {
+        if (isToppling) {
+          desiredTarget.copy(lastActiveWavePos).add(new THREE.Vector3(0, 0.15, 0));
+          const sideOffset = new THREE.Vector3(-lastActiveWaveDir.z, 0, lastActiveWaveDir.x).multiplyScalar(2.4);
+          const backOffset = lastActiveWaveDir.clone().multiplyScalar(-2.2);
+          desiredPos.copy(lastActiveWavePos).add(sideOffset).add(backOffset);
+          desiredPos.y = Math.max(0.85, lastActiveWavePos.y + 0.95);
+        } else if (starterDomino) {
+          const sp = starterDomino.body.position;
+          desiredTarget.set(sp.x, sp.y + 0.1, sp.z);
+          desiredPos.set(sp.x - 2.2, sp.y + 1.1, sp.z + 2.4);
+        }
+      } else {
+        // 'wave' (Default Dramatic Wave Tracker)
+        if (isToppling) {
+          desiredTarget.copy(lastActiveWavePos);
+          desiredPos.set(
+            lastActiveWavePos.x + 5.8,
+            Math.max(4.6, lastActiveWavePos.y + 4.4),
+            lastActiveWavePos.z + 6.8
+          );
+        } else {
+          desiredTarget.copy(buildDef.camTarget);
+          desiredPos.copy(buildDef.camPos);
+        }
+      }
+
+      // Allow manual orbit inspection if the user drags, then smoothly resume tracking
+      if (isUserDragging) {
+        controls.update();
+        smoothCamPos.copy(camera.position);
+        smoothCamTarget.copy(controls.target);
+        return;
+      }
+
+      const lerpAlpha = 1 - Math.exp(-dt * 2.6);
+      smoothCamPos.lerp(desiredPos, lerpAlpha);
+      smoothCamTarget.lerp(desiredTarget, lerpAlpha * 1.25);
+
+      camera.position.copy(smoothCamPos);
+      controls.target.copy(smoothCamTarget);
+      controls.update();
+    }
+
+    // Raycast Hover & Tap on Any Individual Domino (Mid-Line or Starter)
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let pointerDownPos = { x: 0, y: 0 };
+
+    function getHitDomino(clientX, clientY) {
+      pointer.x = (clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+
+      const meshes = dominoes.map(d => d.mesh);
+      const hits = raycaster.intersectObjects(meshes, false);
+      if (hits.length > 0) {
+        const hitMesh = hits[0].object;
+        return dominoes.find(d => d.mesh === hitMesh) || null;
+      }
+      return null;
+    }
+
+    renderer.domElement.addEventListener('pointermove', (e) => {
+      if (isUserDragging) {
+        hoverRing.visible = false;
+        renderer.domElement.style.cursor = 'grabbing';
+        return;
+      }
+      const hovered = getHitDomino(e.clientX, e.clientY);
+      if (hovered && !hovered.fallen && !hovered.isLintel) {
+        hoverRing.position.set(
+          hovered.body.position.x,
+          hovered.body.position.y - (DOMINO_H * hovered.scale) * 0.5 + 0.009,
+          hovered.body.position.z
+        );
+        hoverRing.visible = true;
+        renderer.domElement.style.cursor = 'pointer';
+      } else {
+        hoverRing.visible = false;
+        renderer.domElement.style.cursor = 'grab';
+      }
+    });
+
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+      const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      if (dist > 6) return; // Ignore orbit drags
+
+      foley.init();
+      const target = getHitDomino(e.clientX, e.clientY);
+
+      if (target) {
+        if (target === starterDomino) starterRing.visible = false;
+        hoverRing.visible = false;
+
+        // Align click tap along the domino's chain axis (picking forward or reverse based on camera view)
+        const camForward = new THREE.Vector3();
+        camera.getWorldDirection(camForward).setY(0).normalize();
+        const chainDir = target.forwardDir.clone();
+        if (chainDir.dot(camForward) < 0) {
+          chainDir.negate();
+        }
+
+        applyCalibratedToppleImpulse(target, chainDir);
+
+        const toast = document.getElementById('hint-toast');
+        if (toast) toast.style.opacity = '0';
+      }
+    });
+
+    // =========================================================================
+    // 9. UI CONTROLS & EVENT BINDINGS
+    // =========================================================================
+    function setActiveButtonGroup(selector, activeEl) {
+      document.querySelectorAll(selector).forEach(btn => {
+        btn.classList.remove('btn-active');
+        btn.classList.add('btn-idle');
+      });
+      activeEl.classList.remove('btn-idle');
+      activeEl.classList.add('btn-active');
+    }
+
+    // Build Selection Buttons
+    document.querySelectorAll('.build-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        foley.init();
+        setActiveButtonGroup('.build-btn', btn);
+        const idx = parseInt(btn.dataset.build, 10);
+        loadBuild(idx);
+      });
+    });
+
+    // Trigger & Rebuild Buttons
+    document.getElementById('btn-trigger').addEventListener('click', triggerStarterDomino);
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      foley.init();
+      loadBuild(currentBuildIndex);
+    });
+
+    // Camera Mode Buttons
+    document.querySelectorAll('.cam-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        setActiveButtonGroup('.cam-btn', btn);
+        cameraMode = btn.dataset.cam;
+      });
+    });
+
+    // Time Scale (Bullet-Time) Buttons
+    document.querySelectorAll('.speed-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.speed-btn').forEach(b => {
+          b.classList.remove('btn-active');
+          b.classList.add('text-stone-300');
+        });
+        btn.classList.add('btn-active');
+        btn.classList.remove('text-stone-300');
+        timeScale = parseFloat(btn.dataset.speed);
+        foley.timeScale = timeScale;
+      });
+    });
+
+    // Tactile Material Palette Buttons
+    document.querySelectorAll('.mat-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.mat-btn').forEach(b => {
+          b.classList.remove('ring-2', 'ring-amber-300', 'ring-offset-2', 'ring-offset-stone-900');
+          b.classList.add('opacity-75');
+        });
+        btn.classList.add('ring-2', 'ring-amber-300', 'ring-offset-2', 'ring-offset-stone-900');
+        btn.classList.remove('opacity-75');
+
+        currentMaterialKey = btn.dataset.mat;
+        foley.materialType = currentMaterialKey;
+
+        const palette = MATERIAL_PALETTES[currentMaterialKey];
+        for (const d of dominoes) {
+          d.mesh.material = palette[d.colorSlot % palette.length];
+        }
+      });
+    });
+
+    // Foley Audio Mute Toggle
+    const btnAudio = document.getElementById('btn-audio');
+    btnAudio.addEventListener('click', () => {
+      foley.init();
+      foley.enabled = !foley.enabled;
+      document.getElementById('icon-audio-on').classList.toggle('hidden', !foley.enabled);
+      document.getElementById('icon-audio-off').classList.toggle('hidden', foley.enabled);
+    });
+
+    // Cinema Mode (Hide/Show HUD)
+    const hudTop = document.getElementById('hud-top');
+    const hudBottom = document.getElementById('hud-bottom');
+    const btnShowUI = document.getElementById('btn-show-ui');
+
+    document.getElementById('btn-hide-ui').addEventListener('click', () => {
+      hudTop.classList.add('opacity-0', 'pointer-events-none');
+      hudBottom.classList.add('opacity-0', 'translate-y-6', 'pointer-events-none');
+      btnShowUI.classList.remove('hidden');
+      btnShowUI.classList.add('flex');
+    });
+
+    btnShowUI.addEventListener('click', () => {
+      hudTop.classList.remove('opacity-0', 'pointer-events-none');
+      hudBottom.classList.remove('opacity-0', 'translate-y-6', 'pointer-events-none');
+      btnShowUI.classList.add('hidden');
+      btnShowUI.classList.remove('flex');
+    });
+
+    // Spacebar shortcut to trigger or rebuild
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!isToppling) {
+          triggerStarterDomino();
+        } else {
+          loadBuild(currentBuildIndex);
+        }
+      }
+    });
+
+    // Responsive Resize Handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      composer.setPixelRatio(renderer.getPixelRatio());
+      composer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // =========================================================================
+    // 10. MAIN RENDER & FIXED-STEP PHYSICS LOOP
+    // =========================================================================
+    const clock = new THREE.Clock();
+    let pulseTime = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const rawDt = Math.min(clock.getDelta(), 0.05);
+      const scaledDt = rawDt * timeScale;
+      pulseTime += rawDt;
+
+      // Subtle breathing pulse on starter ring
+      if (starterRing.visible) {
+        const s = 1 + Math.sin(pulseTime * 4) * 0.08;
+        starterRing.scale.set(s, s, 1);
+        starterRingMat.opacity = 0.55 + Math.sin(pulseTime * 4) * 0.25;
+      }
+
+      // Fixed-step rigid-body physics (120Hz); time scale (bullet-time) just feeds in less time per frame
+      if (scaledDt > 0) {
+        stepPhysics(scaledDt);
+      }
+
+      const waveInfo = updateDominoStatesAndWave();
+      updateCameraDirector(rawDt, waveInfo);
+
+      composer.render();
+    }
+
+    // Boot Sequence
+    window.addEventListener('load', () => {
+      loadBuild(0);
+      const loader = document.getElementById('loader-overlay');
+      setTimeout(() => {
+        loader.style.opacity = '0';
+        setTimeout(() => loader.remove(), 700);
+      }, 350);
+      animate();
+    });
+  </script>
+</body>
+</html>
