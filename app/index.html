@@ -535,13 +535,13 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.96;
+    renderer.toneMapping = THREE.NeutralToneMapping;   // keeps colour saturation from overhead (ACES bleached it)
+    renderer.toneMappingExposure = 0.92;
     container.appendChild(renderer.domElement);
 
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
-    scene.environmentIntensity = 0.48;
+    scene.environmentIntensity = 0.34;
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -765,7 +765,7 @@
       ],
       // Rainbow: 12 glossy candy colours, picked by position along the chain so a rainbow wave runs down the line
       rainbow: Array.from({ length: 12 }, (_, i) => new THREE.MeshPhysicalMaterial({
-        color: new THREE.Color().setHSL(i / 12, 0.82, 0.55), roughness: 0.22, metalness: 0.0, clearcoat: 1.0, clearcoatRoughness: 0.08 })),
+        color: new THREE.Color().setHSL(i / 12, 0.82, 0.55), roughness: 0.3, metalness: 0.0, clearcoat: 0.55, clearcoatRoughness: 0.15 })),
       // Neon: dark faces with glowing rims (bloom is raised and the room is darkened while this is selected)
       neon: ['#22d3ee', '#ff4fd8', '#a3ff3c'].map((c) => ([
         new THREE.MeshStandardMaterial({ color: '#0b0c12', roughness: 0.55, metalness: 0.0, envMapIntensity: 0.2 }),
@@ -3226,7 +3226,7 @@
 
 
     // ---- backup / restore, install, back-button guard ---------------------------------------------------
-    const APP_VERSION = '2.3';
+    const APP_VERSION = '2.3.1';
     const BK_KEY = 'atelier.lastBackup.v1';
     $('app-ver').textContent = APP_VERSION;
     const B64 = /^[A-Za-z0-9+/=]+$/;
