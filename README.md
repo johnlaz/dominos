@@ -7,7 +7,7 @@ A calm 3D domino toppling studio, built as a single-file PWA (Three.js + cannon-
 **Open it:** https://johnlaz.github.io/dominos/ then tap *Open the studio*, or install it from the browser menu.
 
 ## What it does
-- **Featured boards:** six pre-built layouts, including the big Grand Finale and the multi-level Grand Viaduct.
+- **Featured boards:** six pre-built layouts, including the big Grand Finale and the multi-level Grand Viaduct, which ends in three Cathedral walls.
 - **Pattern generator:** Switchback, Spiral, Bloom, Fractal Tree, Mandala, Fishbone. Turn on **Combine** to chain 2–3 patterns into one board.
 - **Build your own:** drag on the floor to lay a line, start beside a piece to fork a branch.
 - **My boards:** save, rename, thumbnail cards, share links.
