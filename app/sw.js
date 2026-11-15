@@ -1,5 +1,5 @@
 /* Atelier Domino service worker: works offline after the first online visit. */
-const V = 'atelier-domino-v2.1';
+const V = 'atelier-domino-v2.2';
 const SHELL = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (e) => {

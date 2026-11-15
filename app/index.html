@@ -212,7 +212,8 @@
             <button data-build="1" class="opt build-btn btn-idle transition">Viaduct &amp; Steps</button>
             <button data-build="2" class="opt build-btn btn-idle transition">Kinetic Mandala</button>
             <button data-build="3" class="opt build-btn btn-idle transition">Cathedral Wall</button>
-            <button data-build="4" class="opt build-btn btn-idle wide transition">Grand Finale</button>
+            <button data-build="4" class="opt build-btn btn-idle transition">Grand Finale</button>
+            <button data-build="5" class="opt build-btn btn-idle transition">Grand Viaduct</button>
           </div>
         </details>
 
@@ -285,10 +286,12 @@
         <details class="sheet-sec">
           <summary>Material &amp; sound</summary>
           <div class="pt-2.5 flex flex-col gap-3">
-            <div class="flex items-center gap-2.5" title="Domino material finish">
-              <button data-mat="resin" class="mat-btn ring-2 ring-amber-300 ring-offset-2 ring-offset-stone-900 rounded-full w-6 h-6 transition overflow-hidden shadow-md" style="background: linear-gradient(135deg, #fbf8f3 50%, #262322 50%);" title="Polished resin &amp; gold"></button>
-              <button data-mat="wood" class="mat-btn opacity-75 hover:opacity-100 rounded-full w-6 h-6 transition overflow-hidden shadow-md" style="background: linear-gradient(135deg, #deb887 50%, #5c3a21 50%);" title="Beechwood &amp; walnut"></button>
-              <button data-mat="ceramic" class="mat-btn opacity-75 hover:opacity-100 rounded-full w-6 h-6 transition overflow-hidden shadow-md" style="background: linear-gradient(135deg, #8da399 50%, #c87d65 50%);" title="Matte ceramic"></button>
+            <div class="flex items-center justify-between" title="Domino material finish">
+              <button data-mat="resin" class="mat-btn rounded-full w-7 h-7 transition overflow-hidden shadow-md" style="background: linear-gradient(135deg, #fbf8f3 50%, #262322 50%);" title="Polished resin &amp; gold" aria-label="Resin"></button>
+              <button data-mat="classic" class="mat-btn rounded-full w-7 h-7 transition overflow-hidden shadow-md" style="background: radial-gradient(circle at 50% 50%, #161513 0 20%, transparent 22%), #f0e8d2;" title="Classic ivory with pips" aria-label="Classic"></button>
+              <button data-mat="wood" class="mat-btn rounded-full w-7 h-7 transition overflow-hidden shadow-md" style="background: linear-gradient(135deg, #deb887 50%, #5c3a21 50%);" title="Beechwood &amp; walnut" aria-label="Wood"></button>
+              <button data-mat="rainbow" class="mat-btn rounded-full w-7 h-7 transition overflow-hidden shadow-md" style="background: conic-gradient(#ef4444, #f59e0b, #facc15, #22c55e, #3b82f6, #a855f7, #ef4444);" title="Rainbow candy" aria-label="Rainbow"></button>
+              <button data-mat="neon" class="mat-btn rounded-full w-7 h-7 transition overflow-hidden shadow-md" style="background: linear-gradient(135deg, #0d0c12 50%, #22d3ee 50%); box-shadow: 0 0 8px #22d3ee88;" title="Neon glow" aria-label="Neon"></button>
             </div>
             <div class="opt-grid" style="--cols:2">
               <button id="tg-chimes" class="opt btn-idle transition" title="A soft rising note on each impact">Chimes</button>
@@ -459,11 +462,21 @@
           clickFreq = 1850;
           qVal = 2.8;
           decay = 0.052;
-        } else if (this.materialType === 'ceramic') {
-          baseFreq = isFloor ? 1320 : 1960;
-          clickFreq = 4400;
-          qVal = 7.5;
-          decay = 0.065;
+        } else if (this.materialType === 'classic') {        // bone / ivory: a crisp, dry clack
+          baseFreq = isFloor ? 980 : 1380;
+          clickFreq = 2700;
+          qVal = 3.6;
+          decay = 0.046;
+        } else if (this.materialType === 'rainbow') {        // toy plastic: bright and bouncy
+          baseFreq = isFloor ? 1500 : 2150;
+          clickFreq = 3900;
+          qVal = 6.0;
+          decay = 0.05;
+        } else if (this.materialType === 'neon') {          // synthetic: glassy ping with a little tail
+          baseFreq = isFloor ? 700 : 1020;
+          clickFreq = 5200;
+          qVal = 9.0;
+          decay = 0.075;
         } else {
           baseFreq = isFloor ? 880 : 1280;
           clickFreq = 3400;
@@ -734,7 +747,11 @@
 
     const dominoGeo = createBeveledDominoGeometry(DOMINO_W, DOMINO_H, DOMINO_D);
 
-    let currentMaterialKey = 'resin';
+    const MATERIAL_KEYS = ['resin', 'classic', 'wood', 'rainbow', 'neon'];
+    const MATERIAL_STORE = 'atelier.material.v1';
+    let currentMaterialKey = (() => {
+      try { const k = localStorage.getItem(MATERIAL_STORE); return MATERIAL_KEYS.includes(k) ? k : 'resin'; } catch (err) { return 'resin'; }
+    })();
     const MATERIAL_PALETTES = {
       resin: [
         new THREE.MeshPhysicalMaterial({ color: '#f7f3eb', roughness: 0.18, metalness: 0.02, clearcoat: 0.85, clearcoatRoughness: 0.12 }),
@@ -746,12 +763,57 @@
         new THREE.MeshStandardMaterial({ color: '#6b442a', roughness: 0.52, metalness: 0.02 }),
         new THREE.MeshStandardMaterial({ color: '#b57c4a', roughness: 0.45, metalness: 0.04 })
       ],
-      ceramic: [
-        new THREE.MeshPhysicalMaterial({ color: '#8ea399', roughness: 0.68, metalness: 0.0, clearcoat: 0.12 }),
-        new THREE.MeshPhysicalMaterial({ color: '#c77d63', roughness: 0.68, metalness: 0.0, clearcoat: 0.12 }),
-        new THREE.MeshPhysicalMaterial({ color: '#ebe4d8', roughness: 0.62, metalness: 0.0, clearcoat: 0.18 })
-      ]
+      // Rainbow: 12 glossy candy colours, picked by position along the chain so a rainbow wave runs down the line
+      rainbow: Array.from({ length: 12 }, (_, i) => new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color().setHSL(i / 12, 0.82, 0.55), roughness: 0.22, metalness: 0.0, clearcoat: 1.0, clearcoatRoughness: 0.08 })),
+      // Neon: dark faces with glowing rims (bloom is raised and the room is darkened while this is selected)
+      neon: ['#22d3ee', '#ff4fd8', '#a3ff3c'].map((c) => ([
+        new THREE.MeshStandardMaterial({ color: '#0b0c12', roughness: 0.55, metalness: 0.0, envMapIntensity: 0.2 }),
+        new THREE.MeshStandardMaterial({ color: '#0a0a10', roughness: 0.5, metalness: 0.0, emissive: c, emissiveIntensity: 1.0, envMapIntensity: 0.2 })
+      ])),
+      classic: null   // 28 ivory tiles with pips, built the first time it is chosen
     };
+    function buildClassicTiles() {
+      const cw = 160, ch = Math.round(cw * DOMINO_H / DOMINO_W);
+      const grid = { 1: [[.5, .5]], 2: [[.28, .26], [.72, .74]], 3: [[.28, .26], [.5, .5], [.72, .74]],
+        4: [[.28, .26], [.72, .26], [.28, .74], [.72, .74]], 5: [[.28, .26], [.72, .26], [.5, .5], [.28, .74], [.72, .74]],
+        6: [[.28, .2], [.72, .2], [.28, .5], [.72, .5], [.28, .8], [.72, .8]] };
+      const sideMat = new THREE.MeshPhysicalMaterial({ color: '#ece3cb', roughness: 0.35, metalness: 0.0, clearcoat: 0.5, clearcoatRoughness: 0.2 });
+      const tiles = [];
+      for (let a = 0; a <= 6; a++) for (let b = a; b <= 6; b++) {
+        const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+        const g = c.getContext('2d');
+        const bg = g.createLinearGradient(0, 0, cw, ch); bg.addColorStop(0, '#f6efdc'); bg.addColorStop(1, '#e9dfc4');
+        g.fillStyle = bg; g.fillRect(0, 0, cw, ch);
+        const half = (v, y0, y1) => {
+          for (const [px, py] of (grid[v] || [])) {
+            const x = cw * (0.14 + 0.72 * px), y = y0 + (y1 - y0) * py, r = cw * 0.085;
+            const rg = g.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
+            rg.addColorStop(0, '#3a3835'); rg.addColorStop(1, '#0d0d0c');
+            g.fillStyle = rg; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+          }
+        };
+        half(a, ch * 0.05, ch * 0.47); half(b, ch * 0.53, ch * 0.95);
+        g.strokeStyle = '#4a4741'; g.lineWidth = cw * 0.022; g.beginPath(); g.moveTo(cw * 0.12, ch / 2); g.lineTo(cw * 0.88, ch / 2); g.stroke();
+        g.fillStyle = '#b8913f'; g.beginPath(); g.arc(cw / 2, ch / 2, cw * 0.032, 0, Math.PI * 2); g.fill();
+        const tex = new THREE.CanvasTexture(c);
+        tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+        tex.repeat.set(1 / DOMINO_W, 1 / DOMINO_H); tex.offset.set(0.5, 0.5);
+        tiles.push([new THREE.MeshPhysicalMaterial({ map: tex, roughness: 0.3, metalness: 0.0, clearcoat: 0.6, clearcoatRoughness: 0.15 }), sideMat]);
+      }
+      return tiles;
+    }
+    function paletteFor(key) {
+      if (key === 'classic' && !MATERIAL_PALETTES.classic) MATERIAL_PALETTES.classic = buildClassicTiles();
+      return MATERIAL_PALETTES[key];
+    }
+    // one rule for picking a material: rainbow cycles along the chain, classic picks a pseudo-random tile, the rest follow the colour slot
+    function matFor(key, colorSlot, order) {
+      const pal = paletteFor(key);
+      if (key === 'rainbow') return pal[order % pal.length];
+      if (key === 'classic') return pal[(Math.imul(order + 1, 2654435761) >>> 0) % pal.length];
+      return pal[colorSlot % pal.length];
+    }
 
     // =========================================================================
     // 5. CANNON-ES RIGID BODY PHYSICS WORLD (120Hz fixed step, tuned in a headless sim)
@@ -985,8 +1047,7 @@
     const TIP_OMEGA = 2.4; // rad/s given to the piece the user starts / taps
 
     function addDomino(x, y, z, rotY, colorSlot = 0, isStarter = false, scale = 1.0, stack = false) {
-      const palette = MATERIAL_PALETTES[currentMaterialKey];
-      const mat = palette[colorSlot % palette.length];
+      const mat = matFor(currentMaterialKey, colorSlot, dominoes.length);
 
       const mesh = new THREE.Mesh(dominoGeo, mat);
       mesh.scale.set(scale, scale, scale);
@@ -1191,8 +1252,7 @@
     // actually stand (domino<->domino faces are frictionless, which is what lets chains run).
     const LINTEL_LEN = 0.80, LINTEL_DEPTH = 0.55;
     function addLintel(x, yUnder, z) {
-      const palette = MATERIAL_PALETTES[currentMaterialKey];
-      const mesh = new THREE.Mesh(dominoGeo, palette[2]);
+      const mesh = new THREE.Mesh(dominoGeo, matFor(currentMaterialKey, 2, 2));
       mesh.scale.set(LINTEL_DEPTH / DOMINO_W, LINTEL_LEN / DOMINO_H, 1);
       mesh.rotation.set(Math.PI * 0.5, 0, Math.PI * 0.5);
       mesh.castShadow = true;
@@ -1903,6 +1963,47 @@
           }
         }
         if (finalePieces) for (const p of finalePieces) addDomino(p.x, 0, p.z, p.h, p.c, dominoes.length === 0);
+      }
+    });
+
+    // 06: a taller staircase (landing halfway up) over a long bridge, a seven-step cascade, then the proven arc and fan.
+    // Uses exactly the step geometry of board 02 (0.21 m rise, 0.78 m run, 0.39 m pitch) so every transition is one that already topples.
+    BUILDS.push({
+      title: '06 · The Grand Viaduct', autoCam: true,
+      build() {
+        const stepH = 0.21, run = 0.78, baseZ = -1.5, DEPTH = 1.5, HALF = Math.PI * 0.5;
+        let e = 0, c = 0;                                            // e: running x of the structure's leading edge
+        const slab = (a, b, hh) => addPlinth((a + b) / 2, 0, baseZ, b - a, hh, DEPTH);
+        // ground lead-in
+        const x0 = -10.7;
+        for (let i = 0; i < 7; i++) addDomino(x0 + i * 0.38, 0, baseZ, HALF, i % 2, i === 0);
+        e = x0 + 6 * 0.38 + 0.17;
+        let h = 0;
+        const step = (rise) => {                                     // rise: +1 up (slab gets taller), 0 level then down handled by caller
+          slab(e, e + run, h);
+          addDomino(e + run / 2 - 0.19, h, baseZ, HALF, c++ % 3); addDomino(e + run / 2 + 0.20, h, baseZ, HALF, c++ % 3);
+          e += run;
+        };
+        const land = (n) => {
+          const w = n * 0.38 + 0.06; slab(e, e + w, h);
+          for (let i = 0; i < n; i++) addDomino(e + 0.20 + i * 0.38, h, baseZ, HALF, i % 2);
+          e += w;
+        };
+        for (let s = 0; s < 4; s++) { h += stepH; step(); }          // flight A up
+        land(4);                                                     // landing
+        for (let s = 0; s < 3; s++) { h += stepH; step(); }          // flight B up
+        land(6);                                                     // bridge
+        for (let s = 0; s < 7; s++) { step(); h -= stepH; }          // cascade down, first step level with the bridge (as in board 02)
+        addDomino(e + 0.19, 0, baseZ, HALF, 0); addDomino(e + 0.57, 0, baseZ, HALF, 2);
+        const arc = steerChain(e + 0.95, baseZ, HALF, 26, -Math.PI * 1.15, (i) => i % 2);
+        const [aL, aR] = splitPose(arc.next, 0.27, 0.10);
+        const armL = steerChain(aL.x, aL.z, aL.h, 4, +0.55, (i) => (i + 1) % 3);
+        const armR = steerChain(aR.x, aR.z, aR.h, 4, -0.55, (i) => (i + 1) % 3);
+        for (const arm of [armL, armR]) {
+          const [bL, bR] = splitPose(arm.next, 0.27, 0.10);
+          steerChain(bL.x, bL.z, bL.h, 7, +0.10, (k) => (k + 1) % 3);
+          steerChain(bR.x, bR.z, bR.h, 7, -0.10, (k) => (k + 1) % 3);
+        }
       }
     });
 
@@ -2979,24 +3080,27 @@
     });
 
     // Tactile Material Palette Buttons
-    document.querySelectorAll('.mat-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.mat-btn').forEach(b => {
-          b.classList.remove('ring-2', 'ring-amber-300', 'ring-offset-2', 'ring-offset-stone-900');
-          b.classList.add('opacity-75');
-        });
-        btn.classList.add('ring-2', 'ring-amber-300', 'ring-offset-2', 'ring-offset-stone-900');
-        btn.classList.remove('opacity-75');
-
-        currentMaterialKey = btn.dataset.mat;
-        foley.materialType = currentMaterialKey;
-
-        const palette = MATERIAL_PALETTES[currentMaterialKey];
-        for (const d of dominoes) {
-          d.mesh.material = palette[d.colorSlot % palette.length];
-        }
+    function applyMaterial(key, remember) {
+      if (!MATERIAL_KEYS.includes(key)) key = 'resin';
+      document.querySelectorAll('.mat-btn').forEach(b => {
+        const on = b.dataset.mat === key;
+        b.classList.toggle('ring-2', on); b.classList.toggle('ring-amber-300', on);
+        b.classList.toggle('ring-offset-2', on); b.classList.toggle('ring-offset-stone-900', on);
+        b.classList.toggle('opacity-75', !on);
       });
-    });
+      currentMaterialKey = key;
+      foley.materialType = key;
+      for (const d of dominoes) d.mesh.material = matFor(key, d.colorSlot, d.order);
+      // neon wants a dark room and a real glow
+      const dark = key === 'neon';
+      scene.background.set(dark ? '#0b0a10' : '#e9dfd1');
+      scene.fog.color.set(dark ? '#0b0a10' : '#e9dfd1');
+      floorMat.color.set(dark ? '#2e2b2a' : '#ffffff');
+      bloomPass.strength = dark ? 0.35 : 0.08; bloomPass.radius = dark ? 0.35 : 0.4; bloomPass.threshold = dark ? 0.9 : 0.92;
+      if (remember) { try { localStorage.setItem(MATERIAL_STORE, key); } catch (err) { /* blocked */ } }
+    }
+    document.querySelectorAll('.mat-btn').forEach(btn => btn.addEventListener('click', () => applyMaterial(btn.dataset.mat, true)));
+    applyMaterial(currentMaterialKey, false);
 
     // Foley Audio Mute Toggle
     const btnAudio = document.getElementById('btn-audio');
@@ -3109,7 +3213,7 @@
 
 
     // ---- backup / restore, install, back-button guard ---------------------------------------------------
-    const APP_VERSION = '2.1';
+    const APP_VERSION = '2.2';
     const BK_KEY = 'atelier.lastBackup.v1';
     $('app-ver').textContent = APP_VERSION;
     const B64 = /^[A-Za-z0-9+/=]+$/;
@@ -3230,7 +3334,7 @@
         let m;
         if ((m = /^#p=([a-z]+)\.(\d+)\.([012])$/.exec(h)) && PATTERNS[m[1]]) { selectPattern(m[1], parseInt(m[2], 10) >>> 0, parseInt(m[3], 10)); return; }
         if ((m = /^#m=([a-z+]+)\.(\d+)\.([012])$/.exec(h))) { const ids = m[1].split('+'); if (ids.length >= 2 && ids.length <= 3 && ids.every(i => PATTERNS[i])) { if (selectComposite(ids, parseInt(m[2], 10) >>> 0, parseInt(m[3], 10))) return; } }
-        if ((m = /^#c=([0-4])$/.exec(h))) { loadBuild(parseInt(m[1], 10)); return; }
+        if ((m = /^#c=([0-5])$/.exec(h))) { loadBuild(parseInt(m[1], 10)); return; }
         if ((m = /^#b=([A-Za-z0-9_-]+)$/.exec(h))) { builderSaved = decodeStrokes(m[1]); loadBoard(builderDef); return; }
       } catch (e) { /* fall through to the default board */ }
       loadBuild(0);
