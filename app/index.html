@@ -72,6 +72,15 @@
       background: rgba(255, 255, 255, 0.11);
       color: #ffffff;
     }
+    /* consistent control sizing: option grids (equal cells) and segmented controls */
+    .opt-grid { display: grid; gap: 0.375rem; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); }
+    .opt { display: flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 0.5rem; border-width: 1px; border-radius: 0.75rem;
+      font-size: 12px; font-weight: 500; line-height: 1.15; text-align: center; transition: background .15s, color .15s; }
+    .opt.wide { grid-column: 1 / -1; }
+    .opt:disabled, .opt.off { opacity: .4; pointer-events: none; }
+    .seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; padding: 3px; border-radius: 0.8rem;
+      background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.1); }
+    .seg > button { min-height: 34px; border-radius: 0.6rem; font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center; }
     .sheet-sec { border-top: 1px solid rgba(255,255,255,0.08); padding: 0.6rem 0; }
     .sheet-sec:first-child { border-top: none; padding-top: 0; }
     .sheet-sec > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
@@ -186,42 +195,40 @@
       <div id="sheet-library" class="hidden">
         <details class="sheet-sec" open>
           <summary>Featured boards</summary>
-          <div class="flex flex-wrap gap-1.5 pt-2.5">
-            <button data-build="0" class="build-btn btn-active rounded-xl px-3 py-2 text-xs font-medium border transition">01 · Grand Helix</button>
-            <button data-build="1" class="build-btn btn-idle rounded-xl px-3 py-2 text-xs font-medium border transition">02 · Viaduct &amp; Steps</button>
-            <button data-build="2" class="build-btn btn-idle rounded-xl px-3 py-2 text-xs font-medium border transition">03 · Kinetic Mandala</button>
-            <button data-build="3" class="build-btn btn-idle rounded-xl px-3 py-2 text-xs font-medium border transition">04 · Cathedral Wall</button>
-            <button data-build="4" class="build-btn btn-idle rounded-xl px-3 py-2 text-xs font-medium border transition">05 · Grand Finale</button>
+          <div class="opt-grid pt-2.5" style="--cols:2">
+            <button data-build="0" class="opt build-btn btn-active transition">Grand Helix</button>
+            <button data-build="1" class="opt build-btn btn-idle transition">Viaduct &amp; Steps</button>
+            <button data-build="2" class="opt build-btn btn-idle transition">Kinetic Mandala</button>
+            <button data-build="3" class="opt build-btn btn-idle transition">Cathedral Wall</button>
+            <button data-build="4" class="opt build-btn btn-idle wide transition">Grand Finale</button>
           </div>
         </details>
 
         <details class="sheet-sec">
-          <summary>Pattern generator <span class="normal-case tracking-normal text-stone-500">tap again for a new one, or mix 2–3</span></summary>
+          <summary>Pattern generator <span class="normal-case tracking-normal text-stone-500">tap again for a new one</span></summary>
           <div class="pt-2.5 flex flex-col gap-2.5">
-            <div class="flex flex-wrap gap-1.5">
-              <button data-pat="snake" class="pat-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Switchback</button>
-              <button data-pat="spiral" class="pat-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Spiral</button>
-              <button data-pat="bloom" class="pat-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Bloom</button>
-              <button data-pat="tree" class="pat-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Fractal Tree</button>
-              <button data-pat="mandala" class="pat-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Mandala</button>
-              <button data-pat="fishbone" class="pat-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Fishbone</button>
+            <div class="opt-grid" style="--cols:3">
+              <button data-pat="snake" class="opt pat-btn btn-idle transition">Switchback</button>
+              <button data-pat="spiral" class="opt pat-btn btn-idle transition">Spiral</button>
+              <button data-pat="bloom" class="opt pat-btn btn-idle transition">Bloom</button>
+              <button data-pat="tree" class="opt pat-btn btn-idle transition">Fractal Tree</button>
+              <button data-pat="mandala" class="opt pat-btn btn-idle transition">Mandala</button>
+              <button data-pat="fishbone" class="opt pat-btn btn-idle transition">Fishbone</button>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <div class="flex items-center bg-black/30 rounded-lg p-0.5 border border-white/10">
-                <button data-size="0" class="size-btn text-stone-300 hover:text-white rounded-md px-2.5 py-1 text-[11px] font-medium transition">Small</button>
-                <button data-size="1" class="size-btn btn-active rounded-md px-2.5 py-1 text-[11px] font-medium transition">Medium</button>
-                <button data-size="2" class="size-btn text-stone-300 hover:text-white rounded-md px-2.5 py-1 text-[11px] font-medium transition">Large</button>
-              </div>
-              <button id="tg-combine" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition" aria-pressed="false">Combine 2–3</button>
-              <button id="btn-reroll" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition hidden">Re-roll</button>
-              <button id="btn-surprise" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition">Surprise me</button>
+            <div class="seg" role="group" aria-label="Board size">
+              <button data-size="0" class="size-btn text-stone-300 hover:text-white transition">Small</button>
+              <button data-size="1" class="size-btn btn-active transition">Medium</button>
+              <button data-size="2" class="size-btn text-stone-300 hover:text-white transition">Large</button>
             </div>
-            <div class="flex items-center justify-between gap-2 text-[11px] text-stone-400">
-              <span id="pat-info">Pick a pattern to generate a board.</span>
-              <span class="flex gap-3 shrink-0">
-                <button id="btn-pat-save" class="hover:text-amber-200 transition">Save</button>
-                <button id="btn-pat-share" class="hover:text-amber-200 transition">Copy link</button>
-              </span>
+            <div class="opt-grid" style="--cols:3">
+              <button id="tg-combine" class="opt btn-idle transition" aria-pressed="false">Combine 2–3</button>
+              <button id="btn-reroll" class="opt btn-idle transition off">Re-roll</button>
+              <button id="btn-surprise" class="opt btn-idle transition">Surprise me</button>
+            </div>
+            <p id="pat-info" class="text-[11px] text-stone-400 leading-snug">Pick a pattern to generate a board.</p>
+            <div class="opt-grid" style="--cols:2">
+              <button id="btn-pat-save" class="opt btn-idle transition">Save board</button>
+              <button id="btn-pat-share" class="opt btn-idle transition">Copy link</button>
             </div>
           </div>
         </details>
@@ -235,15 +242,13 @@
       <!-- BUILD -->
       <div id="sheet-build" class="hidden">
         <p class="text-[11px] text-stone-300 leading-relaxed">Drag on the floor to lay a line of dominoes. Start a drag <strong class="text-amber-100">beside a piece</strong> to fork a branch off it. Pinch or scroll to zoom.</p>
-        <div class="flex items-center justify-between gap-2 flex-wrap mt-2.5">
-          <span class="text-xs text-stone-300 tabular-nums"><span id="build-count">0</span> / <span id="build-cap">300</span> pieces</span>
-          <div class="flex gap-1.5">
-            <button id="btn-undo" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition">Undo</button>
-            <button id="btn-clear" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition">Clear</button>
-            <button id="btn-build-save" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition">Save</button>
-            <button id="btn-build-share" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition">Copy link</button>
-            <button id="btn-build-done" class="btn-active border rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition">Done</button>
-          </div>
+        <p class="text-xs text-stone-300 tabular-nums mt-2.5"><span id="build-count">0</span> / <span id="build-cap">300</span> pieces</p>
+        <div class="opt-grid mt-2" style="--cols:3">
+          <button id="btn-undo" class="opt btn-idle transition">Undo</button>
+          <button id="btn-clear" class="opt btn-idle transition">Clear</button>
+          <button id="btn-build-save" class="opt btn-idle transition">Save</button>
+          <button id="btn-build-share" class="opt btn-idle transition">Copy link</button>
+          <button id="btn-build-done" class="opt btn-active font-semibold transition" style="grid-column: span 2">Done</button>
         </div>
       </div>
 
@@ -252,16 +257,16 @@
         <details class="sheet-sec" open>
           <summary>Camera &amp; speed</summary>
           <div class="pt-2.5 flex flex-col gap-2.5">
-            <div class="flex flex-wrap gap-1.5">
-              <button data-cam="wave" class="cam-btn btn-active rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Wave Tracker</button>
-              <button data-cam="macro" class="cam-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Low Macro</button>
-              <button data-cam="overhead" class="cam-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Architect Top</button>
-              <button data-cam="orbit" class="cam-btn btn-idle rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition">Free Orbit</button>
+            <div class="opt-grid" style="--cols:2">
+              <button data-cam="wave" class="cam-btn opt btn-active transition">Wave Tracker</button>
+              <button data-cam="macro" class="cam-btn opt btn-idle transition">Low Macro</button>
+              <button data-cam="overhead" class="cam-btn opt btn-idle transition">Architect Top</button>
+              <button data-cam="orbit" class="cam-btn opt btn-idle transition">Free Orbit</button>
             </div>
-            <div class="flex items-center bg-black/30 rounded-lg p-0.5 border border-white/10 self-start">
-              <button data-speed="1.0" class="speed-btn btn-active rounded-md px-2.5 py-1 text-[11px] font-medium transition">1.0×</button>
-              <button data-speed="0.5" class="speed-btn text-stone-300 hover:text-white rounded-md px-2.5 py-1 text-[11px] font-medium transition">0.5×</button>
-              <button data-speed="0.25" class="speed-btn text-stone-300 hover:text-white rounded-md px-2.5 py-1 text-[11px] font-medium transition" title="Bullet-time slow motion">0.25×</button>
+            <div class="seg" role="group" aria-label="Playback speed">
+              <button data-speed="1.0" class="speed-btn btn-active transition">1.0×</button>
+              <button data-speed="0.5" class="speed-btn text-stone-300 hover:text-white transition">0.5×</button>
+              <button data-speed="0.25" class="speed-btn text-stone-300 hover:text-white transition" title="Bullet-time slow motion">0.25×</button>
             </div>
           </div>
         </details>
@@ -273,16 +278,16 @@
               <button data-mat="wood" class="mat-btn opacity-75 hover:opacity-100 rounded-full w-6 h-6 transition overflow-hidden shadow-md" style="background: linear-gradient(135deg, #deb887 50%, #5c3a21 50%);" title="Beechwood &amp; walnut"></button>
               <button data-mat="ceramic" class="mat-btn opacity-75 hover:opacity-100 rounded-full w-6 h-6 transition overflow-hidden shadow-md" style="background: linear-gradient(135deg, #8da399 50%, #c87d65 50%);" title="Matte ceramic"></button>
             </div>
-            <div class="flex flex-wrap gap-1.5">
-              <button id="tg-chimes" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition" title="A soft rising note on each impact">Chimes</button>
-              <button id="tg-haptics" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition" title="Short vibration pulses (phones that support it)">Haptics</button>
+            <div class="opt-grid" style="--cols:2">
+              <button id="tg-chimes" class="opt btn-idle transition" title="A soft rising note on each impact">Chimes</button>
+              <button id="tg-haptics" class="opt btn-idle transition" title="Short vibration pulses (phones that support it)">Haptics</button>
             </div>
           </div>
         </details>
         <details class="sheet-sec">
           <summary>Ambient</summary>
           <div class="pt-2.5 flex flex-col gap-1.5">
-            <button id="tg-zen" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition self-start" title="Endless loop: build a new board, topple it, rest, repeat">Zen loop</button>
+            <button id="tg-zen" class="opt btn-idle transition" title="Endless loop: build a new board, topple it, rest, repeat">Zen loop</button>
             <p class="text-[11px] text-stone-500 leading-relaxed">Builds a fresh pattern, topples it, rests, then starts again. Tap anything to stop.</p>
           </div>
         </details>
@@ -290,10 +295,10 @@
           <summary>Backup &amp; app <span id="bk-dot" class="normal-case tracking-normal text-amber-300 hidden">· back up</span></summary>
           <div class="pt-2.5 flex flex-col gap-2.5">
             <p id="bk-status" class="text-[11px] text-stone-400 leading-relaxed"></p>
-            <div class="flex flex-wrap gap-1.5">
-              <button id="btn-bk-export" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition">Back up now</button>
-              <button id="btn-bk-import" class="btn-idle border rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition">Restore from file</button>
-              <button id="btn-install" class="btn-active border rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition hidden">Install app</button>
+            <div class="opt-grid" style="--cols:2">
+              <button id="btn-bk-export" class="opt btn-idle transition">Back up now</button>
+              <button id="btn-bk-import" class="opt btn-idle transition">Restore file</button>
+              <button id="btn-install" class="opt wide btn-active font-semibold transition hidden">Install app</button>
               <input id="bk-file" type="file" accept="application/json,.json" class="hidden" />
             </div>
             <p id="bk-hint" class="text-[11px] text-stone-500 leading-relaxed">Saved boards live in this browser only. A backup file keeps them safe if you clear site data or switch phones. Restoring merges into what you have and never deletes anything.</p>
@@ -2565,7 +2570,7 @@
       const tg = $('tg-combine');
       tg.classList.toggle('btn-active', combineMode); tg.classList.toggle('btn-idle', !combineMode);
       tg.setAttribute('aria-pressed', combineMode ? 'true' : 'false');
-      $('btn-reroll').classList.toggle('hidden', !(combineMode && comboSel.length >= 2));
+      $('btn-reroll').classList.toggle('off', !(combineMode && comboSel.length >= 2));
     }
     function syncLibraryUI() {
       const idx = BUILDS.indexOf(currentDef);
