@@ -3232,12 +3232,14 @@
       updateZen(nowMs);
       updateCameraDirector(rawDt, waveInfo);
 
+      // fog depth scales with how far the camera is, so high / far views keep their colour
+      { const camD = camera.position.distanceTo(controls.target); scene.fog.density = Math.min(0.013, 0.16 / Math.max(camD, 1)); }
       composer.render();
     }
 
 
     // ---- backup / restore, install, back-button guard ---------------------------------------------------
-    const APP_VERSION = '2.4.1';
+    const APP_VERSION = '2.4.2';
     const BK_KEY = 'atelier.lastBackup.v1';
     $('app-ver').textContent = APP_VERSION;
     const B64 = /^[A-Za-z0-9+/=]+$/;
