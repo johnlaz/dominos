@@ -3017,7 +3017,10 @@
       if (zen.phase === 'wait') {
         if (now - Math.max(zen.t, appearDoneAt) > 1500) { triggerStarterDomino(); zen.phase = 'run'; zen.t = now; }
       } else if (zen.phase === 'run') {
-        if ((isToppling && now - lastActMs > 2800) || now - zen.t > 240000) { zen.phase = 'rest'; zen.t = now; }
+        // 100% fallen (per the counter) moves on after a short beat; otherwise wait for the wave to stop, as before
+        const all = dominoes.length > 0 && fallenCount >= dominoes.length;
+        if (!all) zen.full = 0; else if (!zen.full) zen.full = now;
+        if ((all && now - zen.full > 900) || (isToppling && now - lastActMs > 2800) || now - zen.t > 240000) { zen.phase = 'rest'; zen.t = now; zen.full = 0; }
       } else if (now - zen.t > 2200) {
         // Zen plays mixes of 2 or 3 patterns (3 about 70% of the time) so the loop stays big and busy.
         let ok = false;
@@ -3213,7 +3216,7 @@
 
 
     // ---- backup / restore, install, back-button guard ---------------------------------------------------
-    const APP_VERSION = '2.2';
+    const APP_VERSION = '2.2.1';
     const BK_KEY = 'atelier.lastBackup.v1';
     $('app-ver').textContent = APP_VERSION;
     const B64 = /^[A-Za-z0-9+/=]+$/;
