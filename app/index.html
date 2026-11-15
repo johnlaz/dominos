@@ -1594,6 +1594,10 @@
         d.body.position.x -= cx; d.body.position.z -= cz;
         d.mesh.position.x -= cx; d.mesh.position.z -= cz;
       }
+      for (const sp of staticProps) {   // plinths (stairs, bridges) must move with the dominoes standing on them
+        sp.body.position.x -= cx; sp.body.position.z -= cz;
+        sp.mesh.position.x -= cx; sp.mesh.position.z -= cz;
+      }
       if (starterDomino) starterRing.position.set(starterDomino.body.position.x, 0.008, starterDomino.body.position.z);
     }
     // Smallest radius of curvature along a polyline (metres); used to reject pieces of path too tight to topple
@@ -3233,7 +3237,7 @@
 
 
     // ---- backup / restore, install, back-button guard ---------------------------------------------------
-    const APP_VERSION = '2.4';
+    const APP_VERSION = '2.4.1';
     const BK_KEY = 'atelier.lastBackup.v1';
     $('app-ver').textContent = APP_VERSION;
     const B64 = /^[A-Za-z0-9+/=]+$/;
