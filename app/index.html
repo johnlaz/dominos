@@ -178,6 +178,18 @@
     <span>Show Studio Controls</span>
   </button>
 
+  <!-- Small topple/reset + view buttons (Cinema Mode only) -->
+  <div id="cin-bar" class="fixed left-1/2 -translate-x-1/2 z-30 hidden items-center gap-2" style="bottom: max(1rem, env(safe-area-inset-bottom))">
+    <button id="cin-go" class="glass-pill rounded-full w-11 h-11 flex items-center justify-center text-amber-100 hover:bg-white/15 active:scale-95 transition shadow-lg" aria-label="Topple or reset">
+      <svg id="cin-play" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      <svg id="cin-reset" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+    </button>
+    <button id="cin-view" class="glass-pill rounded-full h-11 px-4 flex items-center gap-2 text-xs font-medium text-amber-100 hover:bg-white/15 active:scale-95 transition shadow-lg" aria-label="Change view">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+      <span id="cin-view-label">Wave</span>
+    </button>
+  </div>
+
   <!-- Subtle Interactive Hint Toast -->
   <div id="hint-toast" class="fixed top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-opacity duration-500">
     <div class="glass-pill rounded-full px-4 py-1.5 text-[11px] text-amber-100/90 tracking-wide flex items-center gap-2 shadow-lg">
@@ -288,7 +300,7 @@
           <summary>Ambient</summary>
           <div class="pt-2.5 flex flex-col gap-1.5">
             <button id="tg-zen" class="opt btn-idle transition" title="Endless loop: build a new board, topple it, rest, repeat">Zen loop</button>
-            <p class="text-[11px] text-stone-500 leading-relaxed">Builds a fresh pattern, topples it, rests, then starts again. Tap anything to stop.</p>
+            <p class="text-[11px] text-stone-500 leading-relaxed">Builds a fresh mix of 2–3 patterns, topples it, rests, then starts again. Tap anything to stop.</p>
           </div>
         </details>
         <details class="sheet-sec">
@@ -2239,11 +2251,11 @@
       afterLoad(def, prev);
       history.replaceState(null, '', '#p=' + id + '.' + def.seed + '.' + size);
     }
-    function selectComposite(ids, seed, size) {
+    function selectComposite(ids, seed, size, quiet) {
       if (builderMode) exitBuild(true);
       const prev = captureForRise();
       const def = resolveComposite(ids, seed, size);
-      if (!def) { showToast('Those do not fit together, try another mix'); return false; }
+      if (!def) { if (!quiet) showToast('Those do not fit together, try another mix'); return false; }
       currentSize = size;
       afterLoad(def, prev);
       history.replaceState(null, '', patternHash(def));
@@ -2906,8 +2918,14 @@
       } else if (zen.phase === 'run') {
         if ((isToppling && now - lastActMs > 2800) || now - zen.t > 240000) { zen.phase = 'rest'; zen.t = now; }
       } else if (now - zen.t > 2200) {
-        const others = patternIds.filter(p => p !== currentDef.patternId);
-        selectPattern(others[Math.floor(Math.random() * others.length)], randomSeed(), [0, 1, 1, 2][Math.floor(Math.random() * 4)]);
+        // Zen plays mixes of 2 or 3 patterns (3 about 70% of the time) so the loop stays big and busy.
+        let ok = false;
+        for (let tries = 0; tries < 4 && !ok; tries++) {
+          const n = Math.random() < 0.7 ? 3 : 2, pool = patternIds.slice(), pick = [];
+          while (pick.length < n) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+          ok = selectComposite(pick, randomSeed(), Math.random() < 0.75 ? 1 : 2, true);
+        }
+        if (!ok) selectPattern(patternIds[Math.floor(Math.random() * patternIds.length)], randomSeed(), 1);
         zen.phase = 'wait'; zen.t = now;
       }
     }
@@ -2994,11 +3012,33 @@
     const hudBottom = document.getElementById('hud-bottom');
     const btnShowUI = document.getElementById('btn-show-ui');
 
+    const cinBar = document.getElementById('cin-bar');
+    const CIN_VIEWS = [['wave', 'Wave'], ['macro', 'Macro'], ['overhead', 'Top'], ['orbit', 'Orbit']];
+    function syncCinema() {
+      document.getElementById('cin-play').classList.toggle('hidden', isToppling);
+      document.getElementById('cin-reset').classList.toggle('hidden', !isToppling);
+      const v = CIN_VIEWS.find(x => x[0] === cameraMode);
+      document.getElementById('cin-view-label').textContent = v ? v[1] : 'Wave';
+    }
+    setInterval(() => { if (!cinBar.classList.contains('hidden')) syncCinema(); }, 300);
+    document.getElementById('cin-go').addEventListener('click', () => {
+      foley.init(); stopZen();
+      if (builderMode) return;
+      if (!isToppling) triggerStarterDomino(); else loadBoard(currentDef);
+      syncCinema();
+    });
+    document.getElementById('cin-view').addEventListener('click', () => {
+      if (builderMode) return;
+      const i = CIN_VIEWS.findIndex(x => x[0] === cameraMode);
+      setCameraMode(CIN_VIEWS[(i + 1) % CIN_VIEWS.length][0]);
+      syncCinema();
+    });
     document.getElementById('btn-hide-ui').addEventListener('click', () => {
       hudTop.classList.add('opacity-0', 'pointer-events-none');
       hudBottom.classList.add('opacity-0', 'translate-y-6', 'pointer-events-none');
       btnShowUI.classList.remove('hidden');
       btnShowUI.classList.add('flex');
+      cinBar.classList.remove('hidden'); cinBar.classList.add('flex'); syncCinema();
     });
 
     btnShowUI.addEventListener('click', () => {
@@ -3006,6 +3046,7 @@
       hudBottom.classList.remove('opacity-0', 'translate-y-6', 'pointer-events-none');
       btnShowUI.classList.add('hidden');
       btnShowUI.classList.remove('flex');
+      cinBar.classList.add('hidden'); cinBar.classList.remove('flex');
     });
 
     // Spacebar shortcut to trigger or rebuild
