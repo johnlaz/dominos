@@ -1,6 +1,6 @@
-<p align="center"><img src="app/icon-512.png" width="120" alt="Atelier Domino" /></p>
+<p align="center"><img src="app/icon-512.png" width="120" alt="Domino Studio" /></p>
 
-# Atelier Domino
+# Domino Studio
 
 A calm 3D domino toppling studio, built as a single-file PWA (Three.js + cannon-es).
 

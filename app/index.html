@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Atelier Domino — 3D Kinetic Studio</title>
-  <meta name="description" content="Atelier Domino: a calm 3D domino toppling studio. Build, combine and watch it fall." />
+  <title>Domino Studio — 3D Kinetic Studio</title>
+  <meta name="description" content="Domino Studio: a calm 3D domino toppling studio. Build, combine and watch it fall." />
   <meta name="theme-color" content="#1c1917" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Atelier Domino" />
+  <meta name="apple-mobile-web-app-title" content="Domino Studio" />
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="icon-192.png" />
   <link rel="apple-touch-icon" href="icon-192.png" />
@@ -114,7 +114,7 @@
     <div class="w-12 h-12 rounded-2xl border border-amber-200/30 flex items-center justify-center mb-4 animate-pulse bg-amber-100/5">
       <div class="w-3 h-6 rounded-sm bg-amber-200/80 transform -rotate-12"></div>
     </div>
-    <h1 class="font-serif-display text-2xl tracking-wide text-amber-50">Atelier Domino</h1>
+    <h1 class="font-serif-display text-2xl tracking-wide text-amber-50">Domino Studio</h1>
     <p id="loader-status" class="text-xs uppercase tracking-[0.22em] text-stone-400 mt-2">Crafting Studio Textures &amp; Physics...</p>
   </div>
 
@@ -125,7 +125,7 @@
       <div>
         <div class="flex items-center gap-2">
           <span class="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"></span>
-          <h1 class="font-serif-display text-base sm:text-lg text-amber-50 tracking-wide leading-none">Atelier Domino</h1>
+          <h1 class="font-serif-display text-base sm:text-lg text-amber-50 tracking-wide leading-none">Domino Studio</h1>
         </div>
         <p id="build-subtitle" class="text-[11px] text-stone-400 mt-1">01 · The Grand Helix &amp; Starburst</p>
       </div>
@@ -318,8 +318,8 @@
             </div>
             <p id="bk-hint" class="text-[11px] text-stone-500 leading-relaxed">Saved boards live in this browser only. A backup file keeps them safe if you clear site data or switch phones. Restoring merges into what you have and never deletes anything.</p>
             <div class="flex items-center justify-between text-[10px] text-stone-500">
-              <span>Atelier Domino v<span id="app-ver"></span> · LAZLAB Creations</span>
-              <a href="mailto:lazlab.io@gmail.com?subject=Atelier%20Domino" class="hover:text-amber-200 transition">Note to self</a>
+              <span>Domino Studio v<span id="app-ver"></span> · LAZLAB Creations</span>
+              <a href="mailto:lazlab.io@gmail.com?subject=Domino%20Studio" class="hover:text-amber-200 transition">Note to self</a>
             </div>
           </div>
         </details>
@@ -748,7 +748,7 @@
     const dominoGeo = createBeveledDominoGeometry(DOMINO_W, DOMINO_H, DOMINO_D);
 
     const MATERIAL_KEYS = ['resin', 'classic', 'wood', 'rainbow', 'neon'];
-    const MATERIAL_STORE = 'atelier.material.v1';
+    const MATERIAL_STORE = 'dominostudio.material.v1';
     let currentMaterialKey = (() => {
       try { const k = localStorage.getItem(MATERIAL_STORE); return MATERIAL_KEYS.includes(k) ? k : 'resin'; } catch (err) { return 'resin'; }
     })();
@@ -2771,7 +2771,7 @@
     });
 
     // ---- saving & sharing (localStorage is best-effort: private mode / blocked storage just disables it) ----
-    const SAVE_KEY = 'atelier.boards.v1', DRAFT_KEY = 'atelier.draft.v1', MAX_SAVED = 30;
+    const SAVE_KEY = 'dominostudio.boards.v1', DRAFT_KEY = 'dominostudio.draft.v1', MAX_SAVED = 30;
     function readSaved() { try { const a = JSON.parse(localStorage.getItem(SAVE_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
     function writeSaved(a) { try { localStorage.setItem(SAVE_KEY, JSON.stringify(a.slice(0, MAX_SAVED))); return true; } catch (e) { return false; } }
     function makeThumb() {
@@ -3239,8 +3239,8 @@
 
 
     // ---- backup / restore, install, back-button guard ---------------------------------------------------
-    const APP_VERSION = '2.4.2';
-    const BK_KEY = 'atelier.lastBackup.v1';
+    const APP_VERSION = '2.4.3';
+    const BK_KEY = 'dominostudio.lastBackup.v1';
     $('app-ver').textContent = APP_VERSION;
     const B64 = /^[A-Za-z0-9+/=]+$/;
     function cleanEntry(e) {
@@ -3263,7 +3263,7 @@
     const entryKey = (e) => e.k === 'b' ? 'b:' + e.d : e.k + ':' + (e.ids ? e.ids.join('+') : e.id) + ':' + e.seed + ':' + e.size;
     function buildBackup() {
       let draft = ''; try { draft = localStorage.getItem(DRAFT_KEY) || ''; } catch (err) { /* blocked */ }
-      return { app: 'atelier-domino', format: 1, appVersion: APP_VERSION, savedAt: new Date().toISOString(), boards: readSaved(), draft };
+      return { app: 'domino-studio', format: 1, appVersion: APP_VERSION, savedAt: new Date().toISOString(), boards: readSaved(), draft };
     }
     function bkStatus() {
       const n = readSaved().length;
@@ -3281,12 +3281,12 @@
     async function exportBackup() {
       const data = buildBackup();
       if (!data.boards.length && !data.draft) { showToast('Nothing to back up yet'); return; }
-      const name = 'atelier-domino-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+      const name = 'domino-studio-backup-' + new Date().toISOString().slice(0, 10) + '.json';
       const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
       const file = new File([blob], name, { type: 'application/json' });
       let done = false;
       if (matchMedia('(pointer: coarse)').matches && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: 'Atelier Domino backup' }); done = true; }
+        try { await navigator.share({ files: [file], title: 'Domino Studio backup' }); done = true; }
         catch (err) { if (err && err.name === 'AbortError') return; }
       }
       if (!done) {
@@ -3298,7 +3298,7 @@
     }
     function importBackup(text) {
       let data; try { data = JSON.parse(text); } catch (err) { showToast('That file is not a valid backup'); return; }
-      if (!data || data.app !== 'atelier-domino' || !Array.isArray(data.boards)) { showToast('That file is not an Atelier Domino backup'); return; }
+      if (!data || data.app !== 'domino-studio' || !Array.isArray(data.boards)) { showToast('That file is not a Domino Studio backup'); return; }
       const have = readSaved(), seen = new Set(have.map(entryKey)), incoming = data.boards.map(cleanEntry).filter(Boolean);
       if (typeof data.draft === 'string' && data.draft) {
         const d = cleanEntry({ k: 'b', d: data.draft, name: 'Restored draft' });
@@ -3337,7 +3337,7 @@
     if (!standalone && /iphone|ipad|ipod/i.test(navigator.userAgent)) $('bk-hint').textContent += ' To install on iPhone: Share, then Add to Home Screen.';
     // back button: close whatever is open first, then ask for a second press before leaving
     function installBackGuard() {
-      const mark = () => history.pushState({ atelierGuard: 1 }, '', location.href);
+      const mark = () => history.pushState({ dominoGuard: 1 }, '', location.href);
       let armed = false, timer = 0;
       mark();
       window.addEventListener('popstate', () => {
